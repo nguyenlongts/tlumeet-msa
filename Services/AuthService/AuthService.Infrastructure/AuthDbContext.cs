@@ -1,0 +1,64 @@
+﻿using Microsoft.EntityFrameworkCore;
+using AuthService.Domain.Models;
+
+namespace AuthService.Infrastructure.Data;
+
+public class AuthDbContext : DbContext
+{
+    public AuthDbContext(DbContextOptions<AuthDbContext> options) : base(options)
+    {
+    }
+
+    public DbSet<User> Users { get; set; }
+    public DbSet<Role> Roles { get; set; }
+    public DbSet<UserInfo> UserInfos { get; set; }
+    public DbSet<UserLogin> UserLoginInfos { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Email).IsUnique();
+            entity.Property(e => e.UserName).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Email).IsRequired().HasMaxLength(255);
+            entity.Property(e => e.PasswordHash).IsRequired();
+        });
+
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.UserInfo)
+            .WithOne(ui => ui.User)
+            .HasForeignKey<UserInfo>(ui => ui.UserId);
+
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.LoginInfo)
+            .WithOne(ul => ul.User)
+            .HasForeignKey<UserLogin>(ul => ul.UserId);
+
+        modelBuilder.Entity<Role>()
+            .HasMany(r => r.Users)
+            .WithOne(u => u.Role)
+            .HasForeignKey(u => u.RoleId);
+
+        modelBuilder.Entity<Role>().HasData(
+            new Role { Id = 1, Name = "Admin", Description = "Administrator" },
+            new Role { Id = 2, Name = "User", Description = "Regular User" },
+            new Role { Id = 3, Name = "Guest", Description = "Guest User" }
+        );
+        modelBuilder.Entity<User>().HasData(
+            new User
+            {
+                Id = 1,
+                UserName = "admin",
+                Email = "admin@gmail.com",
+                IsActive = true,
+                RoleId = 1,
+                PasswordHash = "$2a$12$7rC/MDmgSgjS4FEhtfR60eX5KCuweE.SrxUPET7vZ9cNowwJPZPHG",// pass = "admin"
+                CreatedAt = DateTime.UtcNow,
+
+
+            });
+    }
+}

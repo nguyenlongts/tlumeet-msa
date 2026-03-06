@@ -1,0 +1,26 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+COPY AuthService.slnx ./
+
+COPY AuthService.API/AuthService.API.csproj AuthService.API/
+COPY AuthService.Domain/AuthService.Domain.csproj AuthService.Domain/
+COPY AuthService.Application/AuthService.Application.csproj AuthService.Application/
+COPY AuthService.Infrastructure/AuthService.Infrastructure.csproj AuthService.Infrastructure/
+
+RUN dotnet restore AuthService.API/AuthService.API.csproj
+
+COPY . .
+
+WORKDIR /src/AuthService.API
+RUN dotnet build -c Release -o /app/build
+
+FROM build AS publish
+RUN dotnet publish -c Release -o /app/publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENV ASPNETCORE_ENVIRONMENT=Production
+EXPOSE 80
+ENTRYPOINT ["dotnet", "AuthService.API.dll"]
