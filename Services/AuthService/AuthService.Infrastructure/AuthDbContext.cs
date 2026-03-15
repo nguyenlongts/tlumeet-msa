@@ -5,14 +5,13 @@ namespace AuthService.Infrastructure.Data;
 
 public class AuthDbContext : DbContext
 {
-    public AuthDbContext(DbContextOptions<AuthDbContext> options) : base(options)
-    {
-    }
+    public AuthDbContext(DbContextOptions<AuthDbContext> options) : base(options) { }
 
     public DbSet<User> Users { get; set; }
     public DbSet<Role> Roles { get; set; }
     public DbSet<UserInfo> UserInfos { get; set; }
     public DbSet<UserLogin> UserLoginInfos { get; set; }
+    public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,11 +41,23 @@ public class AuthDbContext : DbContext
             .WithOne(u => u.Role)
             .HasForeignKey(u => u.RoleId);
 
+        modelBuilder.Entity<PasswordResetToken>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => e.Token).IsUnique();
+            entity.Property(e => e.Token).IsRequired();
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade); 
+        });
+
         modelBuilder.Entity<Role>().HasData(
             new Role { Id = 1, Name = "Admin", Description = "Administrator" },
-            new Role { Id = 2, Name = "User", Description = "Regular User" },
+            new Role { Id = 2, Name = "User", Description = "Login User" },
             new Role { Id = 3, Name = "Guest", Description = "Guest User" }
         );
+
         modelBuilder.Entity<User>().HasData(
             new User
             {
@@ -55,10 +66,8 @@ public class AuthDbContext : DbContext
                 Email = "admin@gmail.com",
                 IsActive = true,
                 RoleId = 1,
-                PasswordHash = "$2a$12$7rC/MDmgSgjS4FEhtfR60eX5KCuweE.SrxUPET7vZ9cNowwJPZPHG",// pass = "admin"
-                CreatedAt = DateTime.UtcNow,
-
-
+                PasswordHash = "$2a$12$7rC/MDmgSgjS4FEhtfR60eX5KCuweE.SrxUPET7vZ9cNowwJPZPHG",
+                CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc), 
             });
     }
 }
