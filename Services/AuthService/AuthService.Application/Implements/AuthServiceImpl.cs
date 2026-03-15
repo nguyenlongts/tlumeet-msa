@@ -106,7 +106,7 @@ public class AuthServiceImpl : IAuthService
             if (user == null)
                 return ApiResponse<AuthResponse>.ErrorResponse(401, "Email hoặc mật khẩu không chính xác");
 
-            var isLocked = await _userRepository.IsAccountLockedAsync(user.Email);
+            var isLocked = await _userRepository.IsAccountLockedAsync(user);
             if (isLocked)
             {
                 if (!user.IsActive)
@@ -124,9 +124,9 @@ public class AuthServiceImpl : IAuthService
             var isValidPassword = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
             if (!isValidPassword)
             {
-                await _userRepository.IncrementFailedLoginAttemptsAsync(user.Email);
+                await _userRepository.IncrementFailedLoginAttemptsAsync(user);
 
-                var isLockedAfterFail = await _userRepository.IsAccountLockedAsync(user.Email);
+                var isLockedAfterFail = await _userRepository.IsAccountLockedAsync(user);
                 if (isLockedAfterFail)
                 {
                     return ApiResponse<AuthResponse>.ErrorResponse(403,
@@ -136,10 +136,10 @@ public class AuthServiceImpl : IAuthService
                 return ApiResponse<AuthResponse>.ErrorResponse(401, "Email hoặc mật khẩu không chính xác");
             }
 
-            await _userRepository.ResetFailedLoginAttemptsAsync(user.Email);
-
             if (user.LoginInfo != null)
             {
+                user.LoginInfo.FailedLoginAttempts = 0;
+                user.LoginInfo.AccountLockedUntil = null;
                 user.LoginInfo.LastLogin = DateTime.UtcNow;
                 await _userRepository.UpdateAsync(user);
             }
@@ -158,7 +158,7 @@ public class AuthServiceImpl : IAuthService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error in LoginAsync");
+            _logger.LogError(ex, "Lỗi login");
             return ApiResponse<AuthResponse>.ErrorResponse(500, "Lỗi server, vui lòng thử lại sau");
         }
     }
@@ -180,7 +180,8 @@ public class AuthServiceImpl : IAuthService
             var isValid = BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash);
             if (!isValid)
                 return ApiResponse<bool>.ErrorResponse(400, "Mật khẩu hiện tại không đúng");
-
+            if (request.CurrentPassword == request.NewPassword)
+                return ApiResponse<bool>.ErrorResponse(400, "Mật khẩu mới không được trùng mật khẩu cũ");
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
             user.UpdatedAt = DateTime.UtcNow;
 
@@ -190,7 +191,7 @@ public class AuthServiceImpl : IAuthService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error in LoginAsync");
+            _logger.LogError(ex, "Lỗi Change password");
             return ApiResponse<bool>.ErrorResponse(500, "Lỗi server, vui lòng thử lại sau");
         }
     }
@@ -205,6 +206,7 @@ public class AuthServiceImpl : IAuthService
             var user = await _userRepository.GetByEmailAsync(request.Email);
             if (user == null)
                 return ApiResponse<bool>.SuccessResponse(true, "Nếu email tồn tại, link reset đã được gửi");
+            await _userRepository.DeleteUnusedResetTokensAsync(user.Id);
 
             var resetToken = GenerateResetPasswordToken(user);
 
@@ -215,7 +217,7 @@ public class AuthServiceImpl : IAuthService
                 RequestedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(15)
             };
-
+           
             try
             {
                 await _kafkaProducer.PublishAsync(KafkaTopics.PasswordResetRequested, passwordResetEvent);
@@ -225,14 +227,21 @@ public class AuthServiceImpl : IAuthService
                 _logger.LogError(ex, "Failed to publish PasswordReset event for {Email}", request.Email);
                 return ApiResponse<bool>.ErrorResponse(503, "Không thể gửi email lúc này, vui lòng thử lại sau");
             }
-
-            await _userRepository.ResetFailedLoginAttemptsAsync(user.Email);
+            await _userRepository.SaveResetTokenAsync(new PasswordResetToken
+            {
+                UserId = user.Id,
+                Token = resetToken,
+                ExpiresAt = DateTime.UtcNow.AddMinutes(15)
+            });
+            await _userRepository.ResetFailedLoginAttemptsAsync(user);
 
             return ApiResponse<bool>.SuccessResponse(true, "Đã gửi email đặt lại mật khẩu");
         }
         catch (Exception ex)
         {
-            return ApiResponse<bool>.ErrorResponse(500, $"Lỗi server: {ex.Message}");
+            _logger.LogError(ex, "Lỗi Forgot Password");
+
+            return ApiResponse<bool>.ErrorResponse(500, "Lỗi server, vui lòng thử lại sau");
         }
     }
 
@@ -260,7 +269,7 @@ public class AuthServiceImpl : IAuthService
                     ValidateLifetime = true
                 };
                 handler.ValidateToken(request.Token, validationParams, out var validatedToken);
-                jwt = handler.ReadJwtToken(request.Token);
+                jwt = (JwtSecurityToken)validatedToken;
             }
             catch
             {
@@ -270,7 +279,9 @@ public class AuthServiceImpl : IAuthService
             var type = jwt.Claims.FirstOrDefault(c => c.Type == "type")?.Value;
             if (type != "reset-password")
                 return ApiResponse<bool>.ErrorResponse(400, "Token không hợp lệ");
-
+            var savedToken = await _userRepository.GetResetTokenAsync(request.Token);
+            if (savedToken == null || savedToken.IsUsed || savedToken.ExpiresAt < DateTime.UtcNow)
+                return ApiResponse<bool>.ErrorResponse(400, "Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn");
             var userEmail = jwt.Claims.First(c => c.Type == "email").Value;
             var user = await _userRepository.GetByEmailAsync(userEmail);
 
@@ -279,14 +290,15 @@ public class AuthServiceImpl : IAuthService
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
             user.UpdatedAt = DateTime.UtcNow;
-
+            savedToken.IsUsed = true;
+            await _userRepository.UpdateResetTokenAsync(savedToken);
             await _userRepository.UpdateAsync(user);
 
             return ApiResponse<bool>.SuccessResponse(true, "Đặt lại mật khẩu thành công");
         }
         catch (Exception ex)
         {
-            return ApiResponse<bool>.ErrorResponse(500, $"Lỗi server: {ex.Message}");
+            return ApiResponse<bool>.ErrorResponse(500, "Lỗi server, vui lòng thử lại sau");
         }
     }
 
@@ -305,7 +317,7 @@ public class AuthServiceImpl : IAuthService
             new Claim("userId", user.Id.ToString()),
             new Claim("name", user.UserName),
             new Claim(ClaimTypes.Email, user.Email),
-            new Claim("role", user.Role?.Name),
+            new Claim("role", user.Role?.Name ?? "User"),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
