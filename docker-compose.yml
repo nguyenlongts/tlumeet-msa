@@ -45,22 +45,62 @@ services:
       timeout: 10s
       retries: 10
       start_period: 30s
+
+  gateway:
+    build:
+      context: ./ApiGateway
+    container_name: gateway
+    ports:
+      - "5555:8080"
+    environment:
+      - Jwt__Key=2f45c598186d199fcef6dd3e81d9d7ff
+      - Jwt__Issuer=TLUMeet
+      - Jwt__Audience=TLUMeet
+    depends_on:
+      - authservice
+      - meetingservice
+      - Notification-Service
+    networks:
+      - kafka-network
+
   authservice:
     image: authservice
     ports:
       - "8081:8080"
     environment:
       KAFKA_BROKER: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
     networks:
       - kafka-network
+
+  meetingservice:
+    build:
+      context: ./Services/MeetingService
+    container_name: meetingservice
+    ports:
+      - "8083:8080"
+    environment:
+      KAFKA_BROKER: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - kafka-network
+
   Notification-Service:
     image: notiservice:1.0
     ports:
       - "8082:8080"
     environment:
       KAFKA_BROKER: kafka:29092
+    depends_on:
+      kafka:
+        condition: service_healthy
     networks:
       - kafka-network
+
   kowl:
     image: quay.io/cloudhut/kowl:latest
     container_name: kowl
