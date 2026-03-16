@@ -81,13 +81,17 @@ public class MeetingService : IMeetingService
 
     public async Task<ApiResponse<bool>> DeleteMeetingAsync(int id)
     {
-        var deleted = await _repository.DeleteAsync(id);
-
-        if (!deleted)
-        {
+        var meeting = await _repository.GetByIdAsync(id);
+        if (meeting == null)
             return ApiResponse<bool>.ErrorResponse(404, "Meeting not found");
-        }
-
+        await _repository.DeleteAsync(id);
+        await _kafkaProducer.PublishAsync(KafkaTopics.MeetingDeleted, new MeetingDeletedEvent
+        {
+            MeetingId = id,
+            RoomCode = meeting.RoomCode,
+            HostEmail = meeting.HostEmail,
+            DeletedAt = DateTimeOffset.UtcNow
+        });
         return ApiResponse<bool>.SuccessResponse(true, "Deleted successfully");
     }
 
@@ -102,6 +106,8 @@ public class MeetingService : IMeetingService
         var meeting = await _repository.GetByRoomCodeAsync(roomCode);
         if (meeting == null || meeting.HostEmail != hostEmail)
             return ApiResponse<bool>.ErrorResponse(403, "Not allowed");
+        if (meeting.Status == MeetingStatus.Ended)
+            return ApiResponse<bool>.ErrorResponse(400, "Meeting already ended");
         meeting.ActualStartTime = DateTimeOffset.UtcNow;
         meeting.Status = MeetingStatus.Live;
 
@@ -121,7 +127,9 @@ public class MeetingService : IMeetingService
         var meeting = await _repository.GetByRoomCodeAsync(roomCode);
         if (meeting == null || meeting.HostEmail != hostEmail)
             return ApiResponse<bool>.ErrorResponse(403, "Not allowed");
-
+        if (meeting.Status != MeetingStatus.Live)
+            return ApiResponse<bool>.ErrorResponse(400, "Meeting is not live");
+        
         meeting.Status = MeetingStatus.Ended;
 
         await _repository.UpdateAsync(meeting);
@@ -152,25 +160,25 @@ public class MeetingService : IMeetingService
         return ApiResponse<MeetingStatusDto>.SuccessResponse(dto);
     }
 
-    public async Task<ApiResponse<MeetingParticipantResponse>> JoinMeetingAsync(
-        string roomCode,
-        string? userEmail,
-        string? guestName)
+    public async Task<ApiResponse<MeetingParticipantResponse>> JoinMeetingAsync( string roomCode, string? userEmail,string? guestName)
     {
         var meeting = await _repository.GetByRoomCodeAsync(roomCode);
         if (meeting == null)
             return ApiResponse<MeetingParticipantResponse>.ErrorResponse(404, "Meeting not found");
-
+        if (meeting.Status == MeetingStatus.Ended)
+            return ApiResponse<MeetingParticipantResponse>.ErrorResponse(400, "Meeting ended");
+        if (userEmail == null && string.IsNullOrWhiteSpace(guestName))
+            return ApiResponse<MeetingParticipantResponse>.ErrorResponse(400, "Guest name is required");
         int roleId;
         int? guestId = null;
 
         if (userEmail != null)
         {
-            roleId = 2;
+            roleId = (int)ParticipantRole.User;
         }
         else
         {
-            roleId = 3;
+            roleId = (int)ParticipantRole.Guest;
             var guest = new Guest { DisplayName = guestName! };
             await _repository.AddGuestAsync(guest);
             guestId = guest.Id;
@@ -208,7 +216,7 @@ public class MeetingService : IMeetingService
         if (participant == null)
             return ApiResponse<bool>.ErrorResponse(404, "Participant not found");
 
-        participant.LeftAt = DateTime.UtcNow;
+        participant.LeftAt = DateTimeOffset.UtcNow;
         await _repository.UpdateParticipantAsync(participant);
         await _kafkaProducer.PublishAsync(KafkaTopics.ParticipantLeft,
             new ParticipantLeftEvent
@@ -280,29 +288,18 @@ public class MeetingService : IMeetingService
         var meeting = await _repository.GetByRoomCodeAsync(request.RoomCode);
         if (meeting == null)
             return ApiResponse<MeetingResponse>.ErrorResponse(404, "Meeting not found");
+        if (meeting.HostEmail != request.HostEmail)
+        {
+            return ApiResponse<MeetingResponse>.ErrorResponse(403, "Not allowed");
 
+        }
         meeting.Title = request.Title;
         meeting.Description = request.Description;
         meeting.ScheduledDateTime = request.ScheduledDateTime;
         meeting.Duration = request.Duration;
 
         await _repository.UpdateAsync(meeting);
-
-        var response = new MeetingResponse
-        {
-            Id = meeting.Id,
-            Title = meeting.Title,
-            Description = meeting.Description,
-            RoomCode = meeting.RoomCode,
-            HostName = meeting.HostEmail,
-            ScheduledDateTime = meeting.ScheduledDateTime,
-            Duration = meeting.Duration,
-            CreatedAt = meeting.CreatedAt,
-            MeetingLink = $"/meet/{meeting.RoomCode}",
-            HostJoinLink = $"/meet/{meeting.RoomCode}?host=true"
-        };
-
-        return ApiResponse<MeetingResponse>.SuccessResponse(response, "Updated");
+        return ApiResponse<MeetingResponse>.SuccessResponse(MapMeeting(meeting), "Updated");
     }
 
 }

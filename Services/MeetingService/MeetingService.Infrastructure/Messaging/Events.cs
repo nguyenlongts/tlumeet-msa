@@ -16,7 +16,13 @@ public class MeetingStartedEvent
     public string HostEmail { get; set; } = string.Empty;
     public DateTimeOffset StartedAt { get; set; }
 }
-
+public class MeetingDeletedEvent
+{
+    public int MeetingId { get; set; }
+    public string RoomCode { get; set; } = string.Empty;
+    public string HostEmail { get; set; } = string.Empty;
+    public DateTimeOffset DeletedAt { get; set; }
+}
 public class MeetingEndedEvent
 {
     public int MeetingId { get; set; }

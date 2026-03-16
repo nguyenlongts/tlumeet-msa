@@ -93,17 +93,20 @@ public class MeetingController : ControllerBase
     public async Task<IActionResult> StartMeeting(string roomCode)
     {
         var email = User.FindFirst(ClaimTypes.Email)?.Value;
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized();
         var result = await _meetingService.StartMeetingAsync(roomCode, email);
         if (!result.Success)
             return StatusCode(result.StatusCode, result);
 
         return Ok(result);
     }
-
+    [Authorize]
     [HttpPost("{roomCode}/end")]
     public async Task<IActionResult> EndMeeting(string roomCode, [FromBody] EndMeetingRequest request)
     {
-        var result = await _meetingService.EndMeetingAsync(roomCode, request.HostEmail);
+        var email = User.FindFirst(ClaimTypes.Email)?.Value;
+        var result = await _meetingService.EndMeetingAsync(roomCode, email);
         if (!result.Success)
             return StatusCode(result.StatusCode, result);
 
