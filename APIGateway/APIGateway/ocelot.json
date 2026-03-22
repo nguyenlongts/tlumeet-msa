@@ -28,6 +28,18 @@
       }
     },
     {
+      "UpstreamPathTemplate": "/api/jaas/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "OPTIONS" ],
+      "DownstreamPathTemplate": "/api/jaas/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "meetingservice",
+          "Port": 8080
+        }
+      ]
+    },
+    {
       "UpstreamPathTemplate": "/api/notification/{everything}",
       "UpstreamHttpMethod": [ "GET", "OPTIONS" ],
       "DownstreamPathTemplate": "/api/notification/{everything}",
