@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace MeetingService.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class init : Migration
+    public partial class initDB : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -36,13 +36,12 @@ namespace MeetingService.Infrastructure.Migrations
                     Description = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
                     RoomCode = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     HostEmail = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    ScheduledDateTime = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    ScheduledDateTime = table.Column<DateTime>(type: "datetime2", nullable: true),
                     Duration = table.Column<int>(type: "int", nullable: false),
                     RequireHostToStart = table.Column<bool>(type: "bit", nullable: false),
-                    IsStarted = table.Column<bool>(type: "bit", nullable: false),
-                    ActualStartTime = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false)
+                    ActualStartTime = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Status = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {

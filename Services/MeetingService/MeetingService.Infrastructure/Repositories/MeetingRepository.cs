@@ -65,7 +65,7 @@ public class MeetingRepository : IMeetingRepository
         if (meeting == null || meeting.HostEmail != hostEmail)
             return null;
 
-        meeting.ActualStartTime = DateTimeOffset.UtcNow;
+        meeting.ActualStartTime = DateTime.UtcNow;
         meeting.Status = MeetingStatus.Live;
         await _context.SaveChangesAsync();
         return meeting;

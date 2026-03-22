@@ -6,7 +6,7 @@ public class CreateMeetingRequest
     public string? Description { get; set; }
     public string HostEmail { get; set; } = string.Empty;
     public bool RequireHostToStart { get; set; }
-    public DateTimeOffset? ScheduledDateTime { get; set; }
+    public DateTime? ScheduledDateTime { get; set; }
 
     public int Duration { get; set; }
 }
@@ -16,7 +16,7 @@ public class UpdateMeetingRequest
     public string RoomCode { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public DateTimeOffset? ScheduledDateTime { get; set; }
+    public DateTime? ScheduledDateTime { get; set; }
     public string HostEmail { get; set; } = string.Empty;
     public int Duration { get; set; }
 }
@@ -28,12 +28,12 @@ public class MeetingResponse
     public string? Description { get; set; }
     public string RoomCode { get; set; } = string.Empty;
     public string HostName { get; set; } = string.Empty;
-    public DateTimeOffset? ScheduledDateTime { get; set; }
+    public DateTime? ScheduledDateTime { get; set; }
 
     public int Duration { get; set; }
     public string MeetingLink { get; set; } = string.Empty;
     public string HostJoinLink { get; set; } = string.Empty;
-    public DateTimeOffset CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; }
 }
 
 public class JoinMeetingRequest
@@ -49,8 +49,8 @@ public class MeetingParticipantResponse
     public string DisplayName { get; set; } = string.Empty;
     public string? Role { get; set; }
     public string JoinToken { get; set; } = string.Empty;
-    public DateTimeOffset JoinedAt { get; set; }
-    public DateTimeOffset? LeftAt { get; set; }
+    public DateTime JoinedAt { get; set; }
+    public DateTime? LeftAt { get; set; }
 }
 
 public class MeetingStatusDto

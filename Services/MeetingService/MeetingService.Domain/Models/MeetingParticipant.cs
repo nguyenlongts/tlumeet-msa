@@ -12,8 +12,8 @@ public class MeetingParticipant
     public string DisplayName { get; set; } = string.Empty;
     public int RoleId { get; set; }
     public string JoinToken { get; set; } = string.Empty;
-    public DateTimeOffset JoinedAt { get; set; } = DateTime.UtcNow;
-    public DateTimeOffset? LeftAt { get; set; }
+    public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? LeftAt { get; set; }
     public Meeting Meeting { get; set; } = null!;
     public Role? Role { get; set; }
 }

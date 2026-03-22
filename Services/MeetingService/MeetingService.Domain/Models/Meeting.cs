@@ -10,15 +10,15 @@ public class Meeting
     public string RoomCode { get; set; } = string.Empty;
     public string HostEmail { get; set; } = string.Empty;
 
-    public DateTimeOffset? ScheduledDateTime { get; set; }
+    public DateTime? ScheduledDateTime { get; set; }
 
     public int Duration { get; set; }
 
     public bool RequireHostToStart { get; set; } = true;
 
-    public DateTimeOffset? ActualStartTime { get; set; }
+    public DateTime? ActualStartTime { get; set; }
 
-    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public MeetingStatus Status { get; set; } = MeetingStatus.Scheduled;
 
 

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace MeetingService.Infrastructure.Migrations
 {
     [DbContext(typeof(MeetingDbContext))]
-    [Migration("20260304145123_UpdateMeeting")]
-    partial class UpdateMeeting
+    [Migration("20260322160607_initDB")]
+    partial class initDB
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -50,11 +50,11 @@ namespace MeetingService.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTimeOffset?>("ActualStartTime")
-                        .HasColumnType("datetimeoffset");
+                    b.Property<DateTime?>("ActualStartTime")
+                        .HasColumnType("datetime2");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
@@ -75,8 +75,8 @@ namespace MeetingService.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<DateTimeOffset?>("ScheduledDateTime")
-                        .HasColumnType("datetimeoffset");
+                    b.Property<DateTime?>("ScheduledDateTime")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");

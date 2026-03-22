@@ -6,7 +6,7 @@ public class MeetingCreatedEvent
     public string Title { get; set; } = string.Empty;
     public string RoomCode { get; set; } = string.Empty;
     public string HostEmail { get; set; } = string.Empty;
-    public DateTimeOffset CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; }
 }
 
 public class MeetingStartedEvent
@@ -14,14 +14,14 @@ public class MeetingStartedEvent
     public int MeetingId { get; set; }
     public string RoomCode { get; set; } = string.Empty;
     public string HostEmail { get; set; } = string.Empty;
-    public DateTimeOffset StartedAt { get; set; }
+    public DateTime StartedAt { get; set; }
 }
 public class MeetingDeletedEvent
 {
     public int MeetingId { get; set; }
     public string RoomCode { get; set; } = string.Empty;
     public string HostEmail { get; set; } = string.Empty;
-    public DateTimeOffset DeletedAt { get; set; }
+    public DateTime DeletedAt { get; set; }
 }
 public class MeetingEndedEvent
 {
@@ -29,7 +29,7 @@ public class MeetingEndedEvent
     public string RoomCode { get; set; } = string.Empty;
     public string HostEmail { get; set; } = string.Empty;
 
-    public DateTimeOffset EndedAt { get; set; }
+    public DateTime EndedAt { get; set; }
 }
 
 public class ParticipantJoinedEvent
@@ -44,7 +44,7 @@ public class ParticipantJoinedEvent
 
     public string ParticipantType { get; set; } = string.Empty; 
 
-    public DateTimeOffset JoinedAt { get; set; }
+    public DateTime JoinedAt { get; set; }
 }
 
 public class ParticipantLeftEvent
@@ -58,5 +58,5 @@ public class ParticipantLeftEvent
 
     public string ParticipantType { get; set; } = string.Empty;
 
-    public DateTimeOffset LeftAt { get; set; }
+    public DateTime LeftAt { get; set; }
 }

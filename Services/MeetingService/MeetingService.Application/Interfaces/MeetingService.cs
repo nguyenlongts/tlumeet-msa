@@ -29,7 +29,7 @@ public class MeetingService : IMeetingService
             ScheduledDateTime = request.ScheduledDateTime,
             Duration = request.Duration,
             RoomCode = Guid.NewGuid().ToString("N")[..8],
-            CreatedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTime.UtcNow,
 
             RequireHostToStart = request.RequireHostToStart,
 
@@ -90,7 +90,7 @@ public class MeetingService : IMeetingService
             MeetingId = id,
             RoomCode = meeting.RoomCode,
             HostEmail = meeting.HostEmail,
-            DeletedAt = DateTimeOffset.UtcNow
+            DeletedAt = DateTime.UtcNow
         });
         return ApiResponse<bool>.SuccessResponse(true, "Deleted successfully");
     }
@@ -108,7 +108,7 @@ public class MeetingService : IMeetingService
             return ApiResponse<bool>.ErrorResponse(403, "Not allowed");
         if (meeting.Status == MeetingStatus.Ended)
             return ApiResponse<bool>.ErrorResponse(400, "Meeting already ended");
-        meeting.ActualStartTime = DateTimeOffset.UtcNow;
+        meeting.ActualStartTime = DateTime.UtcNow;
         meeting.Status = MeetingStatus.Live;
 
         await _repository.UpdateAsync(meeting);
@@ -139,9 +139,9 @@ public class MeetingService : IMeetingService
             {
                 MeetingId = meeting.Id,
                 RoomCode = meeting.RoomCode,
-                EndedAt = DateTimeOffset.UtcNow
+                EndedAt = DateTime.UtcNow
             });
-
+            
         return ApiResponse<bool>.SuccessResponse(true);
     }
 
@@ -216,7 +216,7 @@ public class MeetingService : IMeetingService
         if (participant == null)
             return ApiResponse<bool>.ErrorResponse(404, "Participant not found");
 
-        participant.LeftAt = DateTimeOffset.UtcNow;
+        participant.LeftAt = DateTime.UtcNow;
         await _repository.UpdateParticipantAsync(participant);
         await _kafkaProducer.PublishAsync(KafkaTopics.ParticipantLeft,
             new ParticipantLeftEvent
