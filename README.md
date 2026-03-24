@@ -2,7 +2,7 @@
 
 ---
 
-Architecture: A
+Architecture:
 
 * API Gateway: Ocelot
 * Services:
@@ -38,7 +38,7 @@ Each service follows Clean Architecture:
 
 
 
-## ⚙️ Setup & Run
+## Setup & Run
 
 ### 1. Start services (Docker + Kafka)
 
