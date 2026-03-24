@@ -2,7 +2,7 @@
 
 ---
 
-Architecture
+Architecture: A
 
 * API Gateway: Ocelot
 * Services:
@@ -16,6 +16,15 @@ Architecture
 ### Flow Overview
 
 Client → API Gateway → Services → Kafka → Notification Service
+
+### Service Architecture
+
+Each service follows Clean Architecture:
+
+- Domain Layer  
+- Application Layer  
+- Infrastructure Layer  
+- API Layer  
 
 ---
 
