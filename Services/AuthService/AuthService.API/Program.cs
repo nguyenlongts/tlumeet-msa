@@ -21,7 +21,7 @@ builder.Services.AddDbContext<AuthDbContext>(options =>
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 builder.Services.AddScoped<IAuthService, AuthServiceImpl>();
-
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddSingleton<IKafkaProducer, KafkaProducer>();
 
 var jwtKey = builder.Configuration["Jwt:Key"];
