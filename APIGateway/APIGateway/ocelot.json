@@ -12,6 +12,33 @@
         }
       ]
     },
+
+    {
+      "UpstreamPathTemplate": "/api/meeting/check/{roomCode}",
+      "UpstreamHttpMethod": [ "GET", "OPTIONS" ],
+      "DownstreamPathTemplate": "/api/meeting/check/{roomCode}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "meetingservice",
+          "Port": 8080
+        }
+      ]
+    },
+
+    {
+      "UpstreamPathTemplate": "/api/meeting/{roomCode}/status",
+      "UpstreamHttpMethod": [ "GET", "OPTIONS" ],
+      "DownstreamPathTemplate": "/api/meeting/{roomCode}/status",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "meetingservice",
+          "Port": 8080
+        }
+      ]
+    },
+
     {
       "UpstreamPathTemplate": "/api/meeting/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE", "OPTIONS" ],
@@ -22,11 +49,9 @@
           "Host": "meetingservice",
           "Port": 8080
         }
-      ],
-      "AuthenticationOptions": {
-        "AuthenticationProviderKey": "Bearer"
-      }
+      ]
     },
+
     {
       "UpstreamPathTemplate": "/api/jaas/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "OPTIONS" ],
@@ -39,6 +64,7 @@
         }
       ]
     },
+
     {
       "UpstreamPathTemplate": "/api/notification/{everything}",
       "UpstreamHttpMethod": [ "GET", "OPTIONS" ],
@@ -49,12 +75,10 @@
           "Host": "notificationservice",
           "Port": 8080
         }
-      ],
-      "AuthenticationOptions": {
-        "AuthenticationProviderKey": "Bearer"
-      }
+      ]
     }
   ],
+
   "GlobalConfiguration": {
     "BaseUrl": "http://localhost:5555"
   }

@@ -108,6 +108,8 @@ public class MeetingService : IMeetingService
             return ApiResponse<bool>.ErrorResponse(403, "Not allowed");
         if (meeting.Status == MeetingStatus.Ended)
             return ApiResponse<bool>.ErrorResponse(400, "Meeting already ended");
+        if (meeting.Status == MeetingStatus.Live)
+            return ApiResponse<bool>.SuccessResponse(true);
         meeting.ActualStartTime = DateTime.UtcNow;
         meeting.Status = MeetingStatus.Live;
 
@@ -125,12 +127,24 @@ public class MeetingService : IMeetingService
     public async Task<ApiResponse<bool>> EndMeetingAsync(string roomCode, string hostEmail)
     {
         var meeting = await _repository.GetByRoomCodeAsync(roomCode);
+
         if (meeting == null || meeting.HostEmail != hostEmail)
             return ApiResponse<bool>.ErrorResponse(403, "Not allowed");
-        if (meeting.Status != MeetingStatus.Live)
-            return ApiResponse<bool>.ErrorResponse(400, "Meeting is not live");
-        
+
+        if (meeting.Status == MeetingStatus.Ended)
+            return ApiResponse<bool>.SuccessResponse(true);
+
         meeting.Status = MeetingStatus.Ended;
+        var participants = await _repository.GetParticipantsByRoomCodeAsync(roomCode);
+
+        foreach (var p in participants)
+        {
+            if (p.LeftAt == null)
+            {
+                p.LeftAt = DateTime.UtcNow;
+                await _repository.UpdateParticipantAsync(p);
+            }
+        }
 
         await _repository.UpdateAsync(meeting);
 
@@ -141,25 +155,29 @@ public class MeetingService : IMeetingService
                 RoomCode = meeting.RoomCode,
                 EndedAt = DateTime.UtcNow
             });
-            
+
         return ApiResponse<bool>.SuccessResponse(true);
     }
 
     public async Task<ApiResponse<MeetingStatusDto>> GetMeetingStatusAsync(string roomCode)
     {
         var meeting = await _repository.GetByRoomCodeAsync(roomCode);
+
         if (meeting == null)
             return ApiResponse<MeetingStatusDto>.ErrorResponse(404, "Meeting not found");
+
         var dto = new MeetingStatusDto
         {
             RoomCode = meeting.RoomCode,
             HostName = meeting.HostEmail,
             RequireHostToStart = meeting.RequireHostToStart,
-            Status = meeting.Status.ToString()
+            Status = meeting.Status.ToString(),
+            IsStarted = meeting.Status == MeetingStatus.Live,
+            IsEnded = meeting.Status == MeetingStatus.Ended
         };
+
         return ApiResponse<MeetingStatusDto>.SuccessResponse(dto);
     }
-
     public async Task<ApiResponse<MeetingParticipantResponse>> JoinMeetingAsync( string roomCode, string? userEmail,string? guestName)
     {
         var meeting = await _repository.GetByRoomCodeAsync(roomCode);
@@ -189,6 +207,7 @@ public class MeetingService : IMeetingService
             MeetingId = meeting.Id,
             RoomCode = meeting.RoomCode,
             DisplayName = userEmail ?? guestName!,
+            UserEmail = userEmail,
             RoleId = roleId,
             GuestId = guestId,
             JoinToken = Guid.NewGuid().ToString()
@@ -218,6 +237,22 @@ public class MeetingService : IMeetingService
 
         participant.LeftAt = DateTime.UtcNow;
         await _repository.UpdateParticipantAsync(participant);
+        var meeting = await _repository.GetByRoomCodeAsync(participant.RoomCode);
+        if (meeting != null && meeting.HostEmail == participant.UserEmail)
+        {
+            meeting.Status = MeetingStatus.Ended;
+
+            await _repository.UpdateAsync(meeting);
+
+            await _kafkaProducer.PublishAsync(KafkaTopics.MeetingEnded,
+                new MeetingEndedEvent
+                {
+                    MeetingId = meeting.Id,
+                    RoomCode = meeting.RoomCode,
+                    EndedAt = DateTime.UtcNow
+                });
+        }
+
         await _kafkaProducer.PublishAsync(KafkaTopics.ParticipantLeft,
             new ParticipantLeftEvent
             {

@@ -103,7 +103,7 @@ public class MeetingController : ControllerBase
     }
     [Authorize]
     [HttpPost("{roomCode}/end")]
-    public async Task<IActionResult> EndMeeting(string roomCode, [FromBody] EndMeetingRequest request)
+    public async Task<IActionResult> EndMeeting(string roomCode)
     {
         var email = User.FindFirst(ClaimTypes.Email)?.Value;
         var result = await _meetingService.EndMeetingAsync(roomCode, email);

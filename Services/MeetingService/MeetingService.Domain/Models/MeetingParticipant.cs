@@ -9,6 +9,7 @@ public class MeetingParticipant
     public string RoomCode { get; set; } = string.Empty;
     public int? UserId { get; set; }
     public int? GuestId { get; set; }
+    public string? UserEmail { get; set; }
     public string DisplayName { get; set; } = string.Empty;
     public int RoleId { get; set; }
     public string JoinToken { get; set; } = string.Empty;

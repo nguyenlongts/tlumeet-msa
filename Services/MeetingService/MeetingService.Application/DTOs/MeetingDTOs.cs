@@ -59,6 +59,9 @@ public class MeetingStatusDto
     public string HostName { get; set; } = string.Empty;
     public bool RequireHostToStart { get; set; }
     public string Status { get; set; } = string.Empty;
+    public bool IsStarted { get; set; }
+    public bool IsEnded { get; set; }
+
 }
 
 public class StartMeetingRequest
