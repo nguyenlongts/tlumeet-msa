@@ -13,4 +13,7 @@ public class User
     public Role? Role { get; set; }
     public UserInfo? UserInfo { get; set; }
     public UserLogin? LoginInfo { get; set; }
+
+    public List<RefreshToken> RefreshTokens { get; set; } = new();
+
 }

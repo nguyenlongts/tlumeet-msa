@@ -136,4 +136,24 @@ public class UserRepository : IUserRepository
         _context.PasswordResetTokens.RemoveRange(tokens);
         await _context.SaveChangesAsync();
     }
+
+    public Task SaveRefreshTokenAsync(RefreshToken refreshToken)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task<RefreshToken> GetRefreshTokenAsync(int userId)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task RevokeRefreshTokenAsync(string token)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task RevokeAllRefreshTokensAsync(int userId)
+    {
+        throw new NotImplementedException();
+    }
 }

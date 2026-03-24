@@ -1,29 +1,32 @@
-﻿using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
-using AuthService.Application.DTOs;
+﻿using AuthService.Application.DTOs;
 using AuthService.Application.Interfaces;
 using AuthService.Domain.Interfaces;
 using AuthService.Domain.Models;
 using AuthService.Infrastructure.Messaging;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace AuthService.Application.Services.Implements;
 
 public class AuthServiceImpl : IAuthService
 {
     private readonly IUserRepository _userRepository;
+    private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IConfiguration _configuration;
     private readonly IKafkaProducer _kafkaProducer;
     private readonly ILogger<AuthServiceImpl> _logger;
-    public AuthServiceImpl(IUserRepository userRepository, IConfiguration configuration, IKafkaProducer kafkaProducer, ILogger<AuthServiceImpl> logger)
+    public AuthServiceImpl(IUserRepository userRepository, IConfiguration configuration, IKafkaProducer kafkaProducer, ILogger<AuthServiceImpl> logger, IRefreshTokenRepository refreshTokenRepository)
     {
         _userRepository = userRepository;
         _configuration = configuration;
         _kafkaProducer = kafkaProducer;
         _logger = logger;
+        _refreshTokenRepository = refreshTokenRepository;
     }
 
     public async Task<ApiResponse<AuthResponse>> RegisterAsync(RegisterRequest request)
@@ -60,13 +63,14 @@ public class AuthServiceImpl : IAuthService
             var createdUser = await _userRepository.CreateAsync(user);
 
             var token = GenerateJwtToken(createdUser);
-
+            var refreshToken = CreateNewRefreshToken(user.Id);
             var response = new AuthResponse
             {
                 Id = createdUser.Id,
                 Name = createdUser.UserName,
                 Email = createdUser.Email,
-                Token = token
+                Token = token,
+                 RefreshToken = refreshToken.Token.ToString()
             };
             var userRegisteredEvent = new UserRegisteredEvent
             {
@@ -146,12 +150,25 @@ public class AuthServiceImpl : IAuthService
 
             var token = GenerateJwtToken(user);
 
+            var refreshToken = Guid.NewGuid();
+            await _refreshTokenRepository.RevokeAllByUserIdAsync(user.Id);
+            var refreshTokenExpDays = int.Parse(_configuration["Jwt:RefreshTokenExpiration"] ?? "7");
+
+            await _refreshTokenRepository.SaveAsync(new RefreshToken
+            {
+                UserId = user.Id,
+                Token = refreshToken,
+                ExpiredAt = DateTime.UtcNow.AddDays(refreshTokenExpDays),
+                CreatedAt = DateTime.UtcNow,
+                RevokeAt = null
+            });
             var response = new AuthResponse
             {
                 Id = user.Id,
                 Name = user.UserName,
                 Email = user.Email,
-                Token = token
+                Token = token,
+                RefreshToken = refreshToken.ToString()
             };
 
             return ApiResponse<AuthResponse>.SuccessResponse(response, "Đăng nhập thành công");
@@ -186,6 +203,7 @@ public class AuthServiceImpl : IAuthService
             user.UpdatedAt = DateTime.UtcNow;
 
             await _userRepository.UpdateAsync(user);
+            await _refreshTokenRepository.RevokeAllByUserIdAsync(user.Id);
 
             return ApiResponse<bool>.SuccessResponse(true, "Đổi mật khẩu thành công");
         }
@@ -217,7 +235,7 @@ public class AuthServiceImpl : IAuthService
                 RequestedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddMinutes(15)
             };
-           
+
             try
             {
                 await _kafkaProducer.PublishAsync(KafkaTopics.PasswordResetRequested, passwordResetEvent);
@@ -360,6 +378,66 @@ public class AuthServiceImpl : IAuthService
         catch
         {
             return false;
+        }
+    }
+
+    public async Task<ApiResponse<AuthResponse>> RefreshTokenAsync(string refreshToken)
+    {
+        try
+        {
+            var existingToken = await _refreshTokenRepository.GetByTokenAsync(refreshToken);
+            if (existingToken == null || existingToken.ExpiredAt < DateTime.UtcNow || existingToken.RevokeAt != null)
+                return ApiResponse<AuthResponse>.ErrorResponse(400, "Refresh token không hợp lệ hoặc đã hết hạn");
+            var user = await _userRepository.GetByIdAsync(existingToken.UserId);
+            await _refreshTokenRepository.RevokeAsync(existingToken.Token.ToString());
+            var newRefreshToken = CreateNewRefreshToken(existingToken.UserId);
+            await _refreshTokenRepository.SaveAsync(newRefreshToken);
+            var accessToken = GenerateJwtToken(user);
+            var response = new AuthResponse
+            {
+                Id = user.Id,
+                Name = user.UserName,
+                Email = user.Email,
+                Token = accessToken,
+                RefreshToken = newRefreshToken.Token.ToString()
+            };
+            return ApiResponse<AuthResponse>.SuccessResponse(response, "Làm mới token thành công");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Lỗi Refresh Token");
+            return ApiResponse<AuthResponse>.ErrorResponse(500, "Lỗi server, vui lòng thử lại sau");
+        }
+
+    }
+    private RefreshToken CreateNewRefreshToken(int userId)
+    {
+        var expirationDays = int.Parse(_configuration["Jwt:RefreshTokenExpiration"] ?? "7");
+        var token = new RefreshToken
+        {
+            UserId = userId,
+            Token = Guid.NewGuid(),
+            ExpiredAt = DateTime.UtcNow.AddDays(expirationDays),
+            CreatedAt = DateTime.UtcNow,
+            RevokeAt = null
+        };
+        return token;
+    }
+    public async Task<ApiResponse<bool>> LogoutAsync(string refreshToken)
+    {
+        try
+        {
+            var existToken = await _refreshTokenRepository.GetByTokenAsync(refreshToken);
+            if (existToken != null && existToken.RevokeAt == null)
+            {
+                await _refreshTokenRepository.RevokeAsync(existToken.Token.ToString());
+
+            }
+            return ApiResponse<bool>.SuccessResponse(true, "Đăng xuất thành công");
+        }
+        catch (Exception ex)
+        {
+            return ApiResponse<bool>.ErrorResponse(500, "Lỗi server, vui lòng thử lại sau");
         }
     }
 }

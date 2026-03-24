@@ -21,7 +21,7 @@ public class KafkaProducer : IKafkaProducer, IDisposable
 
         var config = new ProducerConfig
         {
-            BootstrapServers = configuration["Kafka:BootstrapServers"] ?? "localhost:9092",
+            BootstrapServers = configuration["Kafka:BootstrapServers"],
             Acks = Acks.All,
             EnableIdempotence = true,
             MessageTimeoutMs = 3000,

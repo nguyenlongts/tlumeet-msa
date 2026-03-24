@@ -12,7 +12,7 @@ public class AuthDbContext : DbContext
     public DbSet<UserInfo> UserInfos { get; set; }
     public DbSet<UserLogin> UserLoginInfos { get; set; }
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
-
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

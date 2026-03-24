@@ -9,4 +9,6 @@ public interface IAuthService
     Task<ApiResponse<bool>> ChangePasswordAsync(string userEmail, ChangePasswordRequest request);
     Task<ApiResponse<bool>> ForgotPasswordAsync(ForgotPasswordRequest request);
     Task<ApiResponse<bool>> ResetPasswordAsync(ResetPasswordRequest request);
+    Task<ApiResponse<AuthResponse>> RefreshTokenAsync(string refreshToken);
+    Task<ApiResponse<bool>> LogoutAsync(string refreshToken);
 }

@@ -96,4 +96,21 @@ public class AuthController : ControllerBase
             role
         });
     }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout([FromBody] RefreshTokenRequest request)
+    {
+        var result = await _authService.LogoutAsync(request.RefreshToken);
+        if (!result.Success)
+            return StatusCode(result.StatusCode, result);
+        return Ok(result);
+    }
+    [HttpPost("refresh")]
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+    {
+        var result = await _authService.RefreshTokenAsync(request.RefreshToken);
+        if (!result.Success)
+            return StatusCode(result.StatusCode, result);
+        return Ok(result);
+    }
 }
