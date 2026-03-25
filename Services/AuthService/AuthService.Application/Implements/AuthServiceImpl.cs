@@ -2,6 +2,7 @@
 using AuthService.Application.Interfaces;
 using AuthService.Domain.Interfaces;
 using AuthService.Domain.Models;
+using AuthService.Infrastructure;
 using AuthService.Infrastructure.Messaging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -9,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace AuthService.Application.Services.Implements;
@@ -19,14 +21,16 @@ public class AuthServiceImpl : IAuthService
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IConfiguration _configuration;
     private readonly IKafkaProducer _kafkaProducer;
+    private readonly AuthDbContext _context;
     private readonly ILogger<AuthServiceImpl> _logger;
-    public AuthServiceImpl(IUserRepository userRepository, IConfiguration configuration, IKafkaProducer kafkaProducer, ILogger<AuthServiceImpl> logger, IRefreshTokenRepository refreshTokenRepository)
+    public AuthServiceImpl(IUserRepository userRepository, IConfiguration configuration, IKafkaProducer kafkaProducer, ILogger<AuthServiceImpl> logger, IRefreshTokenRepository refreshTokenRepository, AuthDbContext context)
     {
         _userRepository = userRepository;
         _configuration = configuration;
         _kafkaProducer = kafkaProducer;
         _logger = logger;
         _refreshTokenRepository = refreshTokenRepository;
+        _context = context;
     }
 
     public async Task<ApiResponse<AuthResponse>> RegisterAsync(RegisterRequest request)
@@ -59,39 +63,53 @@ public class AuthServiceImpl : IAuthService
                 CreatedAt = DateTime.UtcNow,
                 IsActive = true
             };
-
-            var createdUser = await _userRepository.CreateAsync(user);
-
-            var token = GenerateJwtToken(createdUser);
-            var refreshToken = CreateNewRefreshToken(user.Id);
-            var response = new AuthResponse
-            {
-                Id = createdUser.Id,
-                Name = createdUser.UserName,
-                Email = createdUser.Email,
-                Token = token,
-                 RefreshToken = refreshToken.Token.ToString()
-            };
-            var userRegisteredEvent = new UserRegisteredEvent
-            {
-                UserId = createdUser.Id,
-                Email = createdUser.Email,
-                UserName = createdUser.UserName,
-                RegisteredAt = DateTime.UtcNow
-            };
+           
+            await using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                await _kafkaProducer.PublishAsync(KafkaTopics.UserRegistered, userRegisteredEvent);
+                var createdUser = await _userRepository.CreateAsync(user);
+
+                var refreshToken = CreateNewRefreshToken(user.Id);
+                await _context.RefreshTokens.AddAsync(refreshToken);
+                var outboxMessage = new OutboxMessage
+                {
+                    EventType = nameof(UserRegisteredEvent),
+                    Payload = JsonSerializer.Serialize(new UserRegisteredEvent
+                    {
+                        UserId = createdUser.Id,
+                        Email = createdUser.Email,
+                        UserName = createdUser.UserName,
+                        RegisteredAt = DateTime.UtcNow,
+                    }),
+                    CreatedAt = DateTime.UtcNow,
+                    ErrorMessage = null
+                };
+                
+                await _context.OutboxMessages.AddAsync(outboxMessage);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+                var accessToken = GenerateJwtToken(createdUser);
+
+                var response = new AuthResponse
+                {
+                    Id = createdUser.Id,
+                    Name = createdUser.UserName,
+                    Email = createdUser.Email,
+                    Token = accessToken,
+                    RefreshToken = refreshToken.Token.ToString()
+                };
+                return ApiResponse<AuthResponse>.SuccessResponse(response, "Đăng ký thành công");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to publish UserRegistered event for UserId: {UserId}", createdUser.Id);
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Lỗi transaction RegisterAsync");
+                return ApiResponse<AuthResponse>.ErrorResponse(500, "Lỗi server, vui lòng thử lại sau");
             }
-            return ApiResponse<AuthResponse>.SuccessResponse(response, "Đăng ký thành công");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error in RegisterAsync");
+            _logger.LogError(ex, "Error RegisterAsync");
             return ApiResponse<AuthResponse>.ErrorResponse(500, "Lỗi server, vui lòng thử lại sau");
         }
     }
@@ -437,6 +455,8 @@ public class AuthServiceImpl : IAuthService
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Lỗi Logout");
+
             return ApiResponse<bool>.ErrorResponse(500, "Lỗi server, vui lòng thử lại sau");
         }
     }

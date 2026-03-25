@@ -1,6 +1,5 @@
 ﻿using AuthService.Domain.Interfaces;
 using AuthService.Domain.Models;
-using AuthService.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;

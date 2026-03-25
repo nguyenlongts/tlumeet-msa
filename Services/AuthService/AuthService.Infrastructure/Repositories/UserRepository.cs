@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using AuthService.Domain.Interfaces;
 using AuthService.Domain.Models;
-using AuthService.Infrastructure.Data;
 
 namespace AuthService.Infrastructure.Repositories;
 

@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using AuthService.Domain.Models;
 
-namespace AuthService.Infrastructure.Data;
+namespace AuthService.Infrastructure;
 
 public class AuthDbContext : DbContext
 {
@@ -13,6 +13,8 @@ public class AuthDbContext : DbContext
     public DbSet<UserLogin> UserLoginInfos { get; set; }
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
+
+    public DbSet <OutboxMessage> OutboxMessages { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

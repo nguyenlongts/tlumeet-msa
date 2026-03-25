@@ -1,13 +1,14 @@
-using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using AuthService.Application.Interfaces;
 using AuthService.Application.Services.Implements;
 using AuthService.Domain.Interfaces;
-using AuthService.Infrastructure.Data;
-using AuthService.Infrastructure.Repositories;
+using AuthService.Infrastructure;
+using AuthService.Infrastructure.BackgroundAction;
 using AuthService.Infrastructure.Messaging;
+using AuthService.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IAuthService, AuthServiceImpl>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddSingleton<IKafkaProducer, KafkaProducer>();
+builder.Services.AddHostedService<AuthOutboxRelayService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"];
 
