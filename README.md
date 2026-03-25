@@ -28,16 +28,6 @@ Each service follows Clean Architecture:
 
 ---
 
-## Features
-
-* User authentication (JWT)
-* Create & join meetings
-* Real-time video calls (Jitsi)
-* Meeting scheduling
-* Event-driven communication using Kafka (e.g., send notification when a meeting is created)
-
-
-
 ## Setup & Run
 
 ### 1. Start services (Docker + Kafka)
