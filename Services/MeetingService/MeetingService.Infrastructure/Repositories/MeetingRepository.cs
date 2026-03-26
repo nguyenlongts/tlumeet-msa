@@ -1,11 +1,4 @@
-﻿using MeetingService.Domain.Enums;
-using MeetingService.Domain.Interfaces;
-using MeetingService.Domain.Models;
-using MeetingService.Infrastructure;
-using Microsoft.EntityFrameworkCore;
-
-
-public class MeetingRepository : IMeetingRepository
+﻿public class MeetingRepository : IMeetingRepository
 {
     private readonly MeetingDbContext _context;
 
@@ -38,14 +31,12 @@ public class MeetingRepository : IMeetingRepository
     {
 
         _context.Meetings.Add(meeting);
-        await _context.SaveChangesAsync();
         return meeting;
     }
 
     public async Task UpdateAsync(Meeting meeting)
     {
         _context.Meetings.Update(meeting);
-        await _context.SaveChangesAsync();
     }
 
     public async Task<bool> DeleteAsync(int id)
@@ -55,31 +46,7 @@ public class MeetingRepository : IMeetingRepository
             return false;
 
         _context.Meetings.Remove(meeting);
-        await _context.SaveChangesAsync();
         return true;
-    }
-
-    public async Task<Meeting?> StartMeetingAsync(string roomCode, string hostEmail)
-    {
-        var meeting = await GetByRoomCodeAsync(roomCode);
-        if (meeting == null || meeting.HostEmail != hostEmail)
-            return null;
-
-        meeting.ActualStartTime = DateTime.UtcNow;
-        meeting.Status = MeetingStatus.Live;
-        await _context.SaveChangesAsync();
-        return meeting;
-    }
-
-    public async Task<Meeting?> EndMeetingAsync(string roomCode, string hostEmail)
-    {
-        var meeting = await GetByRoomCodeAsync(roomCode);
-        if (meeting == null || meeting.HostEmail != hostEmail)
-            return null;
-
-        meeting.Status = MeetingStatus.Ended;
-        await _context.SaveChangesAsync();
-        return meeting;
     }
 
     public async Task<List<MeetingParticipant>> GetParticipantsByRoomCodeAsync(string roomCode)

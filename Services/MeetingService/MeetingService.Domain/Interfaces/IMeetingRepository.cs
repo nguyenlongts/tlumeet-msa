@@ -11,8 +11,6 @@ public interface IMeetingRepository
     Task<Meeting> CreateAsync(Meeting meeting);
     Task UpdateAsync(Meeting meeting);
     Task<bool> DeleteAsync(int id);
-    Task<Meeting?> StartMeetingAsync(string roomCode, string hostEmail);
-    Task<Meeting?> EndMeetingAsync(string roomCode, string hostEmail);
 
     Task<List<MeetingParticipant>> GetParticipantsByRoomCodeAsync(string roomCode);
     Task<MeetingParticipant?> GetParticipantByIdAsync(int id);

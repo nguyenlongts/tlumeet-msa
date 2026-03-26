@@ -1,7 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using MeetingService.Domain.Models;
-
-namespace MeetingService.Infrastructure;
+﻿namespace MeetingService.Infrastructure;
 
 public class MeetingDbContext : DbContext
 {
@@ -11,6 +8,8 @@ public class MeetingDbContext : DbContext
     public DbSet<MeetingParticipant> Participants { get; set; } = null!;
     public DbSet<Guest> Guests { get; set; } = null!;
     public DbSet<Role> Roles { get; set; }
+    public DbSet<OutboxMessage> OutboxMessages { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
