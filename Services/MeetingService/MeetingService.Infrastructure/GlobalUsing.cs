@@ -1,0 +1,11 @@
+﻿global using Confluent.Kafka;
+global using MeetingService.Domain.Models;
+global using MeetingService.Infrastructure.Messaging;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.Hosting;
+global using Microsoft.Extensions.Logging;
+global using MeetingService.Domain.Interfaces;
+global using MeetingService.Infrastructure;
+global using System.Text.Json;
+global using Microsoft.Extensions.Configuration;

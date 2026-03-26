@@ -53,7 +53,7 @@ public class ParticipantLeftEvent
     public int MeetingId { get; set; }
 
     public string RoomCode { get; set; } = string.Empty;
-
+    public string DisplayName { get; set; } = string.Empty;
     public string? UserEmail { get; set; }
 
     public string ParticipantType { get; set; } = string.Empty;
