@@ -16,7 +16,7 @@ public class MeetingController : ControllerBase
     {
         _meetingService = meetingService;
     }
-
+    [Authorize]
     [HttpPost]
     public async Task<IActionResult> CreateMeeting([FromBody] CreateMeetingRequest request)
     {
