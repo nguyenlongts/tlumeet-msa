@@ -28,7 +28,6 @@ services:
     command: |
       bash -c '
       sed -i "/KAFKA_ZOOKEEPER_CONNECT/d" /etc/confluent/docker/configure
-      echo "Configuring KRaft mode..."
       /etc/confluent/docker/configure
       if [ ! -f /var/lib/kafka/data/meta.properties ]; then
         kafka-storage format --ignore-formatted -t $$CLUSTER_ID -c /etc/kafka/server.properties
@@ -36,15 +35,24 @@ services:
       /etc/confluent/docker/run
       '
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1",
-        ]
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 10
       start_period: 30s
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver
+    environment:
+      SA_PASSWORD: "TlumeetDB1*"
+      ACCEPT_EULA: "Y"
+    ports:
+      - "14333:1433"
+    volumes:
+      - sql-data:/var/opt/mssql
+    networks:
+      - kafka-network
 
   gateway:
     build:
@@ -59,19 +67,24 @@ services:
     depends_on:
       - authservice
       - meetingservice
-      - Notification-Service
+      - notiservice
     networks:
       - kafka-network
 
   authservice:
-    image: authservice
+    build:
+        context: ./Services/AuthService
+    container_name: authservice
     ports:
       - "8081:8080"
     environment:
       KAFKA_BROKER: kafka:29092
+      ConnectionStrings__AuthDB: Server=sqlserver;Database=AuthDB;User=sa;Password=TlumeetDB1*;TrustServerCertificate=True;
     depends_on:
       kafka:
         condition: service_healthy
+      sqlserver:
+        condition: service_started
     networks:
       - kafka-network
 
@@ -83,21 +96,29 @@ services:
       - "8083:8080"
     environment:
       KAFKA_BROKER: kafka:29092
+      ConnectionStrings__DefaultConnection: Server=sqlserver;Database=MeetingDB;User=sa;Password=TlumeetDB1*;TrustServerCertificate=True;
     depends_on:
       kafka:
         condition: service_healthy
+      sqlserver:
+        condition: service_started
     networks:
       - kafka-network
 
-  Notification-Service:
-    image: notiservice:1.0
+  notiservice:
+    build:
+        context: ./Services/NotificationService
+    container_name: notiservice
     ports:
       - "8082:8080"
     environment:
       KAFKA_BROKER: kafka:29092
+      ConnectionStrings__DefaultConnection: Server=sqlserver;Database=NotificationDB;User=sa;Password=TlumeetDB1*;TrustServerCertificate=True;
     depends_on:
       kafka:
         condition: service_healthy
+      sqlserver:
+        condition: service_started
     networks:
       - kafka-network
 
@@ -120,3 +141,4 @@ networks:
 
 volumes:
   kafka-data:
+  sql-data:
