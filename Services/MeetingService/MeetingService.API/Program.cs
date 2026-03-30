@@ -47,6 +47,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 var app = builder.Build();
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<MeetingDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    var retries = 5;
+    while (retries > 0)
+    {
+        try
+        {
+            db.Database.Migrate();
+            logger.LogInformation("Migration applied successfully");
+            break;
+        }
+        catch (Exception ex)
+        {
+            retries--;
+            logger.LogError(ex, "Migration failed, retrying...");
+            Thread.Sleep(5000);
+        }
+    }
+}
 app.UseCors("AllowAll");
 app.UseAuthentication();
 
