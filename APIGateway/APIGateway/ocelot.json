@@ -76,6 +76,22 @@
           "Port": 8080
         }
       ]
+    },
+
+    {
+      "UpstreamPathTemplate": "/api/users/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS" ],
+      "DownstreamPathTemplate": "/api/users/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "user-service",
+          "Port": 8080
+        }
+      ],
+      "AuthenticationOptions":{
+        "AuthenticationProviderKey":"Bearer"
+      }
     }
   ],
 

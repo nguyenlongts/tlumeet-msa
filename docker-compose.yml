@@ -54,6 +54,26 @@ services:
     networks:
       - kafka-network
 
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    command: ["--bind_ip_all"]
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - kafka-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   gateway:
     build:
       context: ./ApiGateway
@@ -68,6 +88,7 @@ services:
       - authservice
       - meetingservice
       - notiservice
+      - user-service
     networks:
       - kafka-network
 
@@ -135,6 +156,25 @@ services:
     networks:
       - kafka-network
 
+  user-service:
+    build:
+      context: ./Services/user-service
+    container_name: user-service
+    ports:
+      - "3001:8080"
+    environment:
+      - MONGODB_URI=mongodb://root:root@mongodb:27017/user_db?authSource=admin
+      - KAFKA_BROKERS=kafka:29092
+      - PORT=8080
+    depends_on:
+      kafka:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    networks:
+      - kafka-network
+
+
 networks:
   kafka-network:
     driver: bridge
@@ -142,3 +182,4 @@ networks:
 volumes:
   kafka-data:
   sql-data:
+  mongo-data:
