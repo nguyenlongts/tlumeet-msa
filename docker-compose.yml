@@ -74,6 +74,7 @@ services:
   authservice:
     build:
         context: ./Services/AuthService
+    image: authservice:${AUTH_VERSION}
     container_name: authservice
     ports:
       - "8081:8080"
@@ -91,6 +92,7 @@ services:
   meetingservice:
     build:
       context: ./Services/MeetingService
+    image: meetingservice:${MEETING_VERSION}
     container_name: meetingservice
     ports:
       - "8083:8080"
@@ -108,6 +110,7 @@ services:
   notiservice:
     build:
         context: ./Services/NotificationService
+    image: notiservice:${NOTI_VERSION}
     container_name: notiservice
     ports:
       - "8082:8080"
