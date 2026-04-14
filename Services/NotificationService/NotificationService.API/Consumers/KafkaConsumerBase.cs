@@ -17,8 +17,7 @@ namespace NotificationService.API.Consumers
             {
                 BootstrapServers = configuration["Kafka:BootstrapServers"],
                 GroupId = GroupId,
-                AutoOffsetReset = AutoOffsetReset.Earliest,
-                EnableAutoCommit = true
+                AutoOffsetReset = AutoOffsetReset.Earliest
             };
             _consumer = new ConsumerBuilder<string, string>(config).Build();
         }
