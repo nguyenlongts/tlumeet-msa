@@ -1,4 +1,4 @@
-﻿namespace MeetingService.Infrastructure.Messaging;
+﻿namespace MeetingService.Application.Events;
 
 public class MeetingCreatedEvent
 {

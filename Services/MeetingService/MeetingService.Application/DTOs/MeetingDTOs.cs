@@ -1,4 +1,6 @@
-﻿namespace MeetingService.Application.DTOs;
+﻿using MeetingService.Domain.Enums;
+
+namespace MeetingService.Application.DTOs;
 
 public class CreateMeetingRequest
 {
@@ -29,10 +31,9 @@ public class MeetingResponse
     public string RoomCode { get; set; } = string.Empty;
     public string HostName { get; set; } = string.Empty;
     public DateTime? ScheduledDateTime { get; set; }
-
+    public string Status { get; set; } = string.Empty;
     public int Duration { get; set; }
     public string MeetingLink { get; set; } = string.Empty;
-    public string HostJoinLink { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
 }
 

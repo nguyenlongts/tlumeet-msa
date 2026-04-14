@@ -3,22 +3,18 @@ using MeetingService.Application.Interfaces;
 using MeetingService.Domain.Enums;
 using MeetingService.Domain.Interfaces;
 using MeetingService.Domain.Models;
-using MeetingService.Infrastructure;
-using MeetingService.Infrastructure.Messaging;
+using MeetingService.Application.Events;
 using System.Text.Json;
-namespace MeetingService.Application.Services;
+namespace MeetingService.Application.Implement;
 
 public class MeetingService : IMeetingService
 {
-    private readonly IMeetingRepository _repository;
 
-    private readonly MeetingDbContext _context;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public MeetingService(
-        IMeetingRepository repository, MeetingDbContext context)
+    public MeetingService( IUnitOfWork unitOfWork)
     {
-        _repository = repository;
-        _context = context;
+        _unitOfWork = unitOfWork; 
     }
 
 
@@ -40,10 +36,10 @@ public class MeetingService : IMeetingService
                 ? MeetingStatus.WaitingForHost
                 : MeetingStatus.Scheduled
         };
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
-            await _repository.CreateAsync(meeting);
+            await _unitOfWork.Meetings.CreateAsync(meeting);
             var outboxMessage = CreateOutboxMessage(nameof(MeetingCreatedEvent), new MeetingCreatedEvent
             {
                 MeetingId = meeting.Id,
@@ -53,22 +49,22 @@ public class MeetingService : IMeetingService
                 CreatedAt = meeting.CreatedAt
             });
 
-            await _context.OutboxMessages.AddAsync(outboxMessage);
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.Outbox.AddAsync(outboxMessage);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
 
             return ApiResponse<MeetingResponse>.SuccessResponse(MapMeeting(meeting));
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackAsync();
             return ApiResponse<MeetingResponse>.ErrorResponse(500, "Lỗi server");
         }
     }
 
     public async Task<ApiResponse<MeetingResponse>> GetMeetingByIdAsync(int id)
     {
-        var meeting = await _repository.GetByIdAsync(id);
+        var meeting = await _unitOfWork.Meetings.GetByIdAsync(id);
         if (meeting == null)
             return ApiResponse<MeetingResponse>.ErrorResponse(404, "Phòng không tồn tại");
 
@@ -77,7 +73,7 @@ public class MeetingService : IMeetingService
 
     public async Task<ApiResponse<List<MeetingResponse>>> GetAllMeetingsAsync()
     {
-        var meetings = await _repository.GetAllAsync();
+        var meetings = await _unitOfWork.Meetings.GetAllAsync();
         return ApiResponse<List<MeetingResponse>>.SuccessResponse(
             meetings.Select(MapMeeting).ToList()
         );
@@ -85,7 +81,7 @@ public class MeetingService : IMeetingService
 
     public async Task<ApiResponse<List<MeetingResponse>>> GetMeetingsByHostEmailAsync(string hostEmail)
     {
-        var meetings = await _repository.GetByHostEmailAsync(hostEmail);
+        var meetings = await _unitOfWork.Meetings.GetByHostEmailAsync(hostEmail);
         return ApiResponse<List<MeetingResponse>>.SuccessResponse(
             meetings.Select(MapMeeting).ToList()
         );
@@ -93,13 +89,13 @@ public class MeetingService : IMeetingService
 
     public async Task<ApiResponse<bool>> DeleteMeetingAsync(int id)
     {
-        var meeting = await _repository.GetByIdAsync(id);
+        var meeting = await _unitOfWork.Meetings.GetByIdAsync(id);
         if (meeting == null)
             return ApiResponse<bool>.ErrorResponse(404, "Phòng không tồn tại");
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
-            await _repository.DeleteAsync(id);
+            await _unitOfWork.Meetings.DeleteAsync(id);
             var outboxMessage = CreateOutboxMessage(nameof(MeetingDeletedEvent), new MeetingDeletedEvent
             {
                 MeetingId = meeting.Id,
@@ -107,27 +103,27 @@ public class MeetingService : IMeetingService
                 HostEmail = meeting.HostEmail,
                 DeletedAt = DateTime.UtcNow
             });
-            await _context.OutboxMessages.AddAsync(outboxMessage);
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.Outbox.AddAsync(outboxMessage);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
             return ApiResponse<bool>.SuccessResponse(true, "Xoá phòng thành công");
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackAsync();
             return ApiResponse<bool>.ErrorResponse(500, "Lỗi server");
         }
     }
 
     public async Task<ApiResponse<bool>> CheckRoomCodeExistsAsync(string roomCode)
     {
-        var meeting = await _repository.GetByRoomCodeAsync(roomCode);
+        var meeting = await _unitOfWork.Meetings.GetByRoomCodeAsync(roomCode);
         return ApiResponse<bool>.SuccessResponse(meeting != null);
     }
 
     public async Task<ApiResponse<bool>> StartMeetingAsync(string roomCode, string hostEmail)
     {
-        var meeting = await _repository.GetByRoomCodeAsync(roomCode);
+        var meeting = await _unitOfWork.Meetings.GetByRoomCodeAsync(roomCode);
         if (meeting == null || meeting.HostEmail != hostEmail)
             return ApiResponse<bool>.ErrorResponse(403, "Bạn không phải chủ phòng");
         if (meeting.Status == MeetingStatus.Ended)
@@ -135,12 +131,12 @@ public class MeetingService : IMeetingService
         if (meeting.Status == MeetingStatus.Live)
             return ApiResponse<bool>.SuccessResponse(true);
       
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             meeting.ActualStartTime = DateTime.UtcNow;
             meeting.Status = MeetingStatus.Live;
-            await _repository.UpdateAsync(meeting);
+            await _unitOfWork.Meetings.UpdateAsync(meeting);
             var outboxMessage = CreateOutboxMessage(nameof(MeetingStartedEvent), new MeetingStartedEvent
             {
                 MeetingId = meeting.Id,
@@ -148,21 +144,21 @@ public class MeetingService : IMeetingService
                 HostEmail = meeting.HostEmail,
                 StartedAt = meeting.ActualStartTime.Value
             });
-            await _context.OutboxMessages.AddAsync(outboxMessage);
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.Outbox.AddAsync(outboxMessage);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
             return ApiResponse<bool>.SuccessResponse(true);
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackAsync();
             return ApiResponse<bool>.ErrorResponse(500, "Lỗi server");
         }
     }
 
     public async Task<ApiResponse<bool>> EndMeetingAsync(string roomCode, string hostEmail)
     {
-        var meeting = await _repository.GetByRoomCodeAsync(roomCode);
+        var meeting = await _unitOfWork.Meetings.GetByRoomCodeAsync(roomCode);
 
         if (meeting == null || meeting.HostEmail != hostEmail)
             return ApiResponse<bool>.ErrorResponse(403, "Not allowed");
@@ -171,21 +167,21 @@ public class MeetingService : IMeetingService
             return ApiResponse<bool>.SuccessResponse(true);
 
 
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             meeting.Status = MeetingStatus.Ended;
-            var participants = await _repository.GetParticipantsByRoomCodeAsync(roomCode);
+            var participants = await _unitOfWork.Meetings.GetParticipantsByRoomCodeAsync(roomCode);
             foreach (var p in participants)
             {
                 if (p.LeftAt == null)
                 {
                     p.LeftAt = DateTime.UtcNow;
-                    await _repository.UpdateParticipantAsync(p);
+                    await _unitOfWork.Meetings.UpdateParticipantAsync(p);
                 }
             }
 
-            await _repository.UpdateAsync(meeting);
+            await _unitOfWork.Meetings.UpdateAsync(meeting);
             var outboxMessage = CreateOutboxMessage(nameof(MeetingEndedEvent), new MeetingEndedEvent
             {
                 MeetingId = meeting.Id,
@@ -193,21 +189,21 @@ public class MeetingService : IMeetingService
                 HostEmail = meeting.HostEmail,
                 EndedAt = DateTime.UtcNow
             });
-            await _context.OutboxMessages.AddAsync(outboxMessage);
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.Outbox.AddAsync(outboxMessage);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
             return ApiResponse<bool>.SuccessResponse(true);
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackAsync();
             return ApiResponse<bool>.ErrorResponse(500, "Lỗi server");
         }
     }
 
     public async Task<ApiResponse<MeetingStatusDto>> GetMeetingStatusAsync(string roomCode)
     {
-        var meeting = await _repository.GetByRoomCodeAsync(roomCode);
+        var meeting = await _unitOfWork.Meetings.GetByRoomCodeAsync(roomCode);
 
         if (meeting == null)
             return ApiResponse<MeetingStatusDto>.ErrorResponse(404, "Phoingf không tồn tại");
@@ -226,7 +222,7 @@ public class MeetingService : IMeetingService
     }
     public async Task<ApiResponse<MeetingParticipantResponse>> JoinMeetingAsync(string roomCode, string? userEmail, string? guestName)
     {
-        var meeting = await _repository.GetByRoomCodeAsync(roomCode);
+        var meeting = await _unitOfWork.Meetings.GetByRoomCodeAsync(roomCode);
         if (meeting == null)
             return ApiResponse<MeetingParticipantResponse>.ErrorResponse(404, "Phòng không tồn tại");
         if (meeting.Status == MeetingStatus.Ended)
@@ -235,7 +231,7 @@ public class MeetingService : IMeetingService
             return ApiResponse<MeetingParticipantResponse>.ErrorResponse(400, "Tên hiển thị không được để trống");
         int roleId;
         int? guestId = null;
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             if (userEmail != null)
@@ -246,7 +242,7 @@ public class MeetingService : IMeetingService
             {
                 roleId = (int)ParticipantRole.Guest;
                 var guest = new Guest { DisplayName = guestName! };
-                await _repository.AddGuestAsync(guest);
+                await _unitOfWork.Meetings.AddGuestAsync(guest);
                 guestId = guest.Id;
             }
 
@@ -261,7 +257,7 @@ public class MeetingService : IMeetingService
                 JoinToken = Guid.NewGuid().ToString()
             };
 
-            await _repository.AddParticipantAsync(participant);
+            await _unitOfWork.Meetings.AddParticipantAsync(participant);
             var outboxMessage = CreateOutboxMessage(nameof(ParticipantJoinedEvent), new ParticipantJoinedEvent
             {
                 ParticipantId = participant.Id,
@@ -272,30 +268,30 @@ public class MeetingService : IMeetingService
                 ParticipantType = participant.UserEmail != null ? "User" : "Guest",
                 JoinedAt = participant.JoinedAt
             });
-            await _context.OutboxMessages.AddAsync(outboxMessage);
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.Outbox.AddAsync(outboxMessage);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
             return ApiResponse<MeetingParticipantResponse>.SuccessResponse(
                 MapParticipant(participant)
             );
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackAsync();
             return ApiResponse<MeetingParticipantResponse>.ErrorResponse(500, "Lỗi server");
         }
     }
 
     public async Task<ApiResponse<bool>> LeaveMeetingAsync(string joinToken)
     {
-        var participant = await _repository.GetParticipantByTokenAsync(joinToken);
+        var participant = await _unitOfWork.Meetings.GetParticipantByTokenAsync(joinToken);
         if (participant == null)
             return ApiResponse<bool>.ErrorResponse(404, "Người tham gia không tồn tại");
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             participant.LeftAt = DateTime.UtcNow;
-            await _repository.UpdateParticipantAsync(participant);
+            await _unitOfWork.Meetings.UpdateParticipantAsync(participant);
             var outboxMessage = CreateOutboxMessage(nameof(ParticipantLeftEvent), new ParticipantLeftEvent
             {
                 ParticipantId = participant.Id,
@@ -306,21 +302,21 @@ public class MeetingService : IMeetingService
                 ParticipantType = participant.UserEmail != null ? "User" : "Guest",
                 LeftAt = participant.LeftAt.Value
             });
-            await _context.OutboxMessages.AddAsync(outboxMessage);
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.Outbox.AddAsync(outboxMessage);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
             return ApiResponse<bool>.SuccessResponse(true);
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackAsync();
             return ApiResponse<bool>.ErrorResponse(500, "Lỗi server");
         }
     }
 
     public async Task<ApiResponse<List<MeetingParticipantResponse>>> GetParticipantsAsync(string roomCode)
     {
-        var participants = await _repository.GetParticipantsByRoomCodeAsync(roomCode);
+        var participants = await _unitOfWork.Meetings.GetParticipantsByRoomCodeAsync(roomCode);
 
         return ApiResponse<List<MeetingParticipantResponse>>.SuccessResponse(
             participants.Select(MapParticipant).ToList()
@@ -329,9 +325,9 @@ public class MeetingService : IMeetingService
 
     public async Task<ApiResponse<MeetingParticipantResponse>> GetParticipantByTokenAsync(string joinToken)
     {
-        var participant = await _repository.GetParticipantByTokenAsync(joinToken);
+        var participant = await _unitOfWork.Meetings.GetParticipantByTokenAsync(joinToken);
         if (participant == null)
-            return ApiResponse<MeetingParticipantResponse>.ErrorResponse(404, "Participant not found");
+            return ApiResponse<MeetingParticipantResponse>.ErrorResponse(404, "Không tìm thấy người tham gia");
 
         return ApiResponse<MeetingParticipantResponse>.SuccessResponse(
             MapParticipant(participant)
@@ -351,8 +347,9 @@ public class MeetingService : IMeetingService
             ScheduledDateTime = m.ScheduledDateTime,
             Duration = m.Duration,
             CreatedAt = m.CreatedAt,
+            Status = m.Status.ToString(),
             MeetingLink = $"/meet/{m.RoomCode}",
-            HostJoinLink = $"/meet/{m.RoomCode}?host=true"
+           
         };
     }
 
@@ -372,15 +369,15 @@ public class MeetingService : IMeetingService
 
     public async Task<ApiResponse<MeetingResponse>> UpdateMeetingAsync(UpdateMeetingRequest request)
     {
-        var meeting = await _repository.GetByRoomCodeAsync(request.RoomCode);
+        var meeting = await _unitOfWork.Meetings.GetByRoomCodeAsync(request.RoomCode);
         if (meeting == null)
-            return ApiResponse<MeetingResponse>.ErrorResponse(404, "Meeting not found");
+            return ApiResponse<MeetingResponse>.ErrorResponse(404, "Phòng không tồn tại");
         if (meeting.HostEmail != request.HostEmail)
         {
             return ApiResponse<MeetingResponse>.ErrorResponse(403, "Not allowed");
 
         }
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             meeting.Title = request.Title;
@@ -388,14 +385,14 @@ public class MeetingService : IMeetingService
             meeting.ScheduledDateTime = request.ScheduledDateTime;
             meeting.Duration = request.Duration;
 
-            await _repository.UpdateAsync(meeting);
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.Meetings.UpdateAsync(meeting);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
             return ApiResponse<MeetingResponse>.SuccessResponse(MapMeeting(meeting), "Cập nhật thành công");
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackAsync();
             return ApiResponse<MeetingResponse>.ErrorResponse(500, "Lỗi server");
         }
     }
