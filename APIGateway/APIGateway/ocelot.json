@@ -12,7 +12,18 @@
         }
       ]
     },
-
+    {
+      "UpstreamPathTemplate": "/hubs/notification",
+      "UpstreamHttpMethod": [ "GET" ],
+      "DownstreamPathTemplate": "/hubs/notification",
+      "DownstreamScheme": "ws",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "notificationservice",
+          "Port": 8080
+        }
+      ]
+    },
     {
       "UpstreamPathTemplate": "/api/meeting/check/{roomCode}",
       "UpstreamHttpMethod": [ "GET", "OPTIONS" ],
@@ -72,7 +83,7 @@
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
         {
-          "Host": "notificationservice",
+          "Host": "notiservice",
           "Port": 8080
         }
       ]
