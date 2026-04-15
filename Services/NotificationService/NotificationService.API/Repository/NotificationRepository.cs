@@ -40,7 +40,6 @@ namespace NotificationService.API.Repository
                 existing.Title = notification.Title;
                 existing.Payload = notification.Payload;
                 existing.IsRead = notification.IsRead;
-                await _context.SaveChangesAsync();
             }
             else
             {

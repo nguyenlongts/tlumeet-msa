@@ -68,11 +68,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-app.MapHub<NotificationHub>("/hubs/notification");
 app.UseHttpsRedirection();
 app.UseAuthentication();
 
 app.UseAuthorization();
+app.MapHub<NotificationHub>("/hubs/notification");
 
 app.MapControllers();
 using (var scope = app.Services.CreateScope())

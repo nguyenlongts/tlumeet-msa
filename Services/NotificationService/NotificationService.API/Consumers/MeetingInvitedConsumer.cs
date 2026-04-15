@@ -32,6 +32,7 @@ namespace NotificationService.API.Consumers
             {
                 InviteId = message.InviteId,
                 RoomCode = message.RoomCode,
+            HostEmail = message.HostEmail,
                 HostName = message.HostName,
                 Title = message.Title,
                 JoinLink = message.JoinLink,
