@@ -24,7 +24,8 @@ builder.Services.AddSingleton<INotificationService, NotiService>();
 builder.Services.AddHostedService<MeetingInvitedConsumer>();
 builder.Services.AddScoped<INotificationAppService, NotificationAppService>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
-builder.Services.AddDbContext<NotificationDbContext>(options => {
+builder.Services.AddDbContext<NotificationDbContext>(options =>
+{
     options.UseSqlServer(builder.Configuration.GetConnectionString("NotificationDatabase"));
 });
 builder.Services.AddHostedService<InviteRespondedConsumer>();
@@ -58,6 +59,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJw
     };
 }
 );
+builder.Services.AddCors(options =>
+    options.AddPolicy("AllowAll", policy =>
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader())
+   );
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
@@ -78,6 +85,23 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
-    dbContext.Database.Migrate();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    var retries = 5;
+    while (retries > 0)
+    {
+        try
+        {
+            dbContext.Database.Migrate();
+            logger.LogInformation("Migration applied successfully");
+            break;
+        }
+        catch (Exception ex)
+        {
+            retries--;
+            logger.LogError(ex, "Migration failed, retrying...");
+            Thread.Sleep(5000);
+        }
+    }
 }
 app.Run();
