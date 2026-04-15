@@ -116,7 +116,7 @@ services:
       - "8082:8080"
     environment:
       KAFKA_BROKER: kafka:29092
-      ConnectionStrings__DefaultConnection: Server=sqlserver;Database=NotificationDB;User=sa;Password=TlumeetDB1*;TrustServerCertificate=True;
+      ConnectionStrings__NotificationDatabase: Server=sqlserver;Database=NotificationDB;User=sa;Password=TlumeetDB1*;TrustServerCertificate=True;
     depends_on:
       kafka:
         condition: service_healthy
