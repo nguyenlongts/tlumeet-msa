@@ -80,7 +80,7 @@ app.UseAuthentication();
 
 app.UseAuthorization();
 app.MapHub<NotificationHub>("/hubs/notification");
-
+app.UseCors("AllowAll");
 app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {

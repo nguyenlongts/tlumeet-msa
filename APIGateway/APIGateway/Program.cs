@@ -42,6 +42,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+app.UseWebSockets();
+
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();

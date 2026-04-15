@@ -405,5 +405,46 @@ public class MeetingService : IMeetingService
             CreatedAt = DateTime.UtcNow
         };
     }
+    public async Task<ApiResponse<bool>> InviteAsync(string roomCode, string hostEmail, List<string> emails)
+    {
+        var meeting = await _unitOfWork.Meetings.GetByRoomCodeAsync(roomCode);
 
+        if (meeting == null)
+            return ApiResponse<bool>.ErrorResponse(404, "Meeting not found");
+
+        if (meeting.HostEmail != hostEmail)
+            return ApiResponse<bool>.ErrorResponse(403, "Only host can invite");
+
+        await _unitOfWork.BeginTransactionAsync();
+        try
+        {
+            foreach (var email in emails)
+            {
+                var evt = new MeetingInvitedEvent
+                {
+                    InviteId = Guid.NewGuid().GetHashCode(),
+                    RoomCode = roomCode,
+                    HostEmail = hostEmail,
+                    HostName = meeting.HostEmail,
+                    Title = meeting.Title,
+                    InviteeEmail = email,
+                    JoinLink = $"http://localhost:5173/join/{roomCode}",
+                    ExpiresAt = DateTime.UtcNow.AddHours(2)
+                };
+
+                var outbox = CreateOutboxMessage(nameof(MeetingInvitedEvent), evt);
+                await _unitOfWork.Outbox.AddAsync(outbox);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
+
+            return ApiResponse<bool>.SuccessResponse(true, "Invites sent");
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync();
+            return ApiResponse<bool>.ErrorResponse(500, "Error sending invites");
+        }
+    }
 }

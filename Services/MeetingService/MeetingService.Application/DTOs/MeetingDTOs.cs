@@ -107,3 +107,7 @@ public class ApiResponse<T>
         };
     }
 }
+public class InviteRequest
+{
+    public List<string> InviteeEmails { get; set; } = new();
+}

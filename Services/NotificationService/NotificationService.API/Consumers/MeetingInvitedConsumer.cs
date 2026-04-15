@@ -26,13 +26,13 @@ namespace NotificationService.API.Consumers
             var dbContext = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<MeetingInvitedConsumer>>();
 
-            logger.LogInformation("Processing invite for {Email}", message.InviteeEmail);
+            logger.LogInformation($"Processing invite for {message.InviteeEmail}");
 
             var inviteDTO = new InviteNotificationDto
             {
                 InviteId = message.InviteId,
                 RoomCode = message.RoomCode,
-            HostEmail = message.HostEmail,
+                HostEmail = message.HostEmail,
                 HostName = message.HostName,
                 Title = message.Title,
                 JoinLink = message.JoinLink,

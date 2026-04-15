@@ -19,7 +19,7 @@
       "DownstreamScheme": "ws",
       "DownstreamHostAndPorts": [
         {
-          "Host": "notificationservice",
+          "Host": "notiservice",
           "Port": 8080
         }
       ]
