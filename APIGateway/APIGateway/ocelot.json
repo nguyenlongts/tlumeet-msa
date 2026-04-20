@@ -78,7 +78,7 @@
 
     {
       "UpstreamPathTemplate": "/api/notification/{everything}",
-      "UpstreamHttpMethod": [ "GET", "OPTIONS" ],
+      "UpstreamHttpMethod": [ "GET","PUT", "OPTIONS" ],
       "DownstreamPathTemplate": "/api/notification/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [

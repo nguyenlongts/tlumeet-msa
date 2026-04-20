@@ -74,3 +74,13 @@ public class MeetingInvitedEvent
 
     public DateTime ExpiresAt { get; set; }
 }
+
+public class InviteRespondedEvent
+{
+    public int InviteId { get; set; }
+    public string RoomCode { get; set; } = string.Empty;
+    public string HostEmail { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string InviteeEmail { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+}

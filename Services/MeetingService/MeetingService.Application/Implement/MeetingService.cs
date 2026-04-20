@@ -1,9 +1,10 @@
 ﻿using MeetingService.Application.DTOs;
+using MeetingService.Application.Events;
 using MeetingService.Application.Interfaces;
 using MeetingService.Domain.Enums;
 using MeetingService.Domain.Interfaces;
 using MeetingService.Domain.Models;
-using MeetingService.Application.Events;
+using System.ComponentModel;
 using System.Text.Json;
 namespace MeetingService.Application.Implement;
 
@@ -410,41 +411,106 @@ public class MeetingService : IMeetingService
         var meeting = await _unitOfWork.Meetings.GetByRoomCodeAsync(roomCode);
 
         if (meeting == null)
-            return ApiResponse<bool>.ErrorResponse(404, "Meeting not found");
+            return ApiResponse<bool>.ErrorResponse(404, "Không tìm thấy phòng");
 
         if (meeting.HostEmail != hostEmail)
-            return ApiResponse<bool>.ErrorResponse(403, "Only host can invite");
+            return ApiResponse<bool>.ErrorResponse(403, "Chỉ chủ phòng mới có thể mời");
 
         await _unitOfWork.BeginTransactionAsync();
         try
         {
             foreach (var email in emails)
             {
-                var evt = new MeetingInvitedEvent
+                var invite = new MeetingInvite
                 {
-                    InviteId = Guid.NewGuid().GetHashCode(),
+                    MeetingId = meeting.Id,
+                    InviteeEmail = email,
+                    InvitedBy = hostEmail,
+                    Status = "Pending",
+                    ExpiresAt = DateTime.UtcNow.AddHours(2)
+                };
+                await _unitOfWork.Meetings.AddInviteAsync(invite);
+                await _unitOfWork.SaveChangesAsync();
+                var outbox = CreateOutboxMessage(nameof(MeetingInvitedEvent), new MeetingInvitedEvent
+                {
+                    InviteId = invite.Id,
                     RoomCode = roomCode,
                     HostEmail = hostEmail,
-                    HostName = meeting.HostEmail,
+                    HostName = hostEmail,
                     Title = meeting.Title,
                     InviteeEmail = email,
                     JoinLink = $"http://localhost:5173/join/{roomCode}",
-                    ExpiresAt = DateTime.UtcNow.AddHours(2)
-                };
-
-                var outbox = CreateOutboxMessage(nameof(MeetingInvitedEvent), evt);
+                    ExpiresAt = invite.ExpiresAt
+                });
                 await _unitOfWork.Outbox.AddAsync(outbox);
             }
 
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
 
-            return ApiResponse<bool>.SuccessResponse(true, "Invites sent");
+            return ApiResponse<bool>.SuccessResponse(true, "Đã mời");
         }
         catch
         {
             await _unitOfWork.RollbackAsync();
             return ApiResponse<bool>.ErrorResponse(500, "Error sending invites");
+        }
+    }
+    public async Task<ApiResponse<bool>> RespondInviteAsync(int inviteId, string inviteeEmail, string status)
+    {
+        var invite = await _unitOfWork.Meetings.GetInviteByIdAsync(inviteId);
+
+        if (invite == null)
+            return ApiResponse<bool>.ErrorResponse(404, "Invite not found");
+        if (invite.InviteeEmail != inviteeEmail)
+            return ApiResponse<bool>.ErrorResponse(403, "Not allowed");
+        if (invite.Status != "Pending")
+            return ApiResponse<bool>.ErrorResponse(400, "Invite already responded");
+        if (invite.ExpiresAt < DateTime.UtcNow)
+            return ApiResponse<bool>.ErrorResponse(400, "Invite expired");
+
+        var meeting = await _unitOfWork.Meetings.GetByIdAsync(invite.MeetingId);
+        if (meeting == null)
+            return ApiResponse<bool>.ErrorResponse(404, "Meeting not found");
+
+        await _unitOfWork.BeginTransactionAsync();
+        try
+        {
+            invite.Status = status;
+            await _unitOfWork.Meetings.UpdateInviteAsync(invite);
+
+            if (status == "Accepted")
+            {
+                var participant = new MeetingParticipant
+                {
+                    MeetingId = meeting.Id,
+                    RoomCode = meeting.RoomCode,
+                    DisplayName = inviteeEmail,
+                    UserEmail = inviteeEmail,
+                    RoleId = (int)ParticipantRole.User,
+                    JoinToken = Guid.NewGuid().ToString()
+                };
+                await _unitOfWork.Meetings.AddParticipantAsync(participant);
+            }
+
+            var outbox = CreateOutboxMessage(nameof(InviteRespondedEvent), new InviteRespondedEvent
+            {
+                InviteId = invite.Id,
+                RoomCode = meeting.RoomCode,
+                HostEmail = meeting.HostEmail,
+                Title = meeting.Title,
+                InviteeEmail = inviteeEmail,
+                Status = status
+            });
+            await _unitOfWork.Outbox.AddAsync(outbox);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
+            return ApiResponse<bool>.SuccessResponse(true);
+        }
+        catch
+        {
+            await _unitOfWork.RollbackAsync();
+            return ApiResponse<bool>.ErrorResponse(500, "Error responding invite");
         }
     }
 }

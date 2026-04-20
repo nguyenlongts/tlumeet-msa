@@ -111,3 +111,8 @@ public class InviteRequest
 {
     public List<string> InviteeEmails { get; set; } = new();
 }
+
+public class InviteRespondRequest
+{
+    public string Status { get; set; } = string.Empty;
+}

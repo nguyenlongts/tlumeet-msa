@@ -172,5 +172,20 @@ public class MeetingController : ControllerBase
 
         return Ok(result);
     }
+
+    [Authorize]
+    [HttpPost("invite/{inviteId}/respond")]
+    public async Task<IActionResult> RespondInvite(int inviteId, [FromBody] InviteRespondRequest request)
+    {
+        var email = User.FindFirst(ClaimTypes.Email)?.Value;
+        if (string.IsNullOrEmpty(email))
+            return Unauthorized();
+
+        var result = await _meetingService.RespondInviteAsync(inviteId, email, request.Status);
+        if (!result.Success)
+            return StatusCode(result.StatusCode, result);
+
+        return Ok(result);
+    }
 }
 

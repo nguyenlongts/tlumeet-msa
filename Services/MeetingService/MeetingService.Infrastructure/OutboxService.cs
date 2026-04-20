@@ -70,6 +70,10 @@ namespace MeetingService.Infrastructure
                             var meetingInvitedEvent = System.Text.Json.JsonSerializer.Deserialize<MeetingInvitedEvent>(message.Payload);
                             await producer.PublishAsync(KafkaTopics.MeetingInvited, meetingInvitedEvent!);
                             break;
+                        case nameof(InviteRespondedEvent):
+                            var inviteRespondedEvent = System.Text.Json.JsonSerializer.Deserialize<InviteRespondedEvent>(message.Payload);
+                            await producer.PublishAsync(KafkaTopics.InviteResponded, inviteRespondedEvent!);
+                            break;
                     }
                     message.OccuredAt = DateTime.UtcNow;
                     message.ErrorMessage = null;

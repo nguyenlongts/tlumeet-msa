@@ -20,4 +20,7 @@ public interface IMeetingService
     Task<ApiResponse<bool>> LeaveMeetingAsync(string joinToken);
     Task<ApiResponse<List<MeetingParticipantResponse>>> GetParticipantsAsync(string roomCode);
     Task<ApiResponse<MeetingParticipantResponse>> GetParticipantByTokenAsync(string joinToken);
+
+    Task<ApiResponse<bool>> RespondInviteAsync(int inviteId, string inviteeEmail, string status);
+
 }
