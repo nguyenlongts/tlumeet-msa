@@ -13,9 +13,21 @@
       ]
     },
     {
-      "UpstreamPathTemplate": "/hubs/notification",
-      "UpstreamHttpMethod": [ "GET" ],
-      "DownstreamPathTemplate": "/hubs/notification",
+      "UpstreamPathTemplate": "/hubs/notification/negotiate",
+      "UpstreamHttpMethod": [ "GET", "POST", "OPTIONS" ],
+      "DownstreamPathTemplate": "/hubs/notification/negotiate",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "notiservice",
+          "Port": 8080
+        }
+      ]
+    },
+    {
+      "UpstreamPathTemplate": "/hubs/notification/{everything}",
+      "UpstreamHttpMethod": [ "GET", "POST", "OPTIONS" ],
+      "DownstreamPathTemplate": "/hubs/notification/{everything}",
       "DownstreamScheme": "ws",
       "DownstreamHostAndPorts": [
         {
@@ -78,7 +90,7 @@
 
     {
       "UpstreamPathTemplate": "/api/notification/{everything}",
-      "UpstreamHttpMethod": [ "GET","PUT", "OPTIONS" ],
+      "UpstreamHttpMethod": [ "GET", "PUT", "OPTIONS" ],
       "DownstreamPathTemplate": "/api/notification/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
