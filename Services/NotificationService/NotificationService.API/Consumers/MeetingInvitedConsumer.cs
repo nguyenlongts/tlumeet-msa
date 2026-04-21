@@ -11,6 +11,7 @@ namespace NotificationService.API.Consumers
         private readonly IServiceProvider _serviceProvider;
         public MeetingInvitedConsumer(IConfiguration configuration, ILogger<MeetingInvitedConsumer> logger, IServiceProvider serviceProvider) : base(configuration, logger)
         {
+
             _serviceProvider = serviceProvider;
         }
 

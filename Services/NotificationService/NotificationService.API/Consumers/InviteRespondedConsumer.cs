@@ -9,14 +9,17 @@ namespace NotificationService.API.Consumers
     public class InviteRespondedConsumer : KafkaConsumerBase<InviteRespondedEvent>
     {
         private readonly IServiceProvider _serviceProvider;
+
+        protected override string GroupId => "notification-service-invite-responded";
         public InviteRespondedConsumer(IConfiguration configuration, ILogger<InviteRespondedConsumer> logger, IServiceProvider serviceProvider) : base(configuration, logger)
         {
             _serviceProvider = serviceProvider;
+
         }
 
         protected override string Topic => "invite-responded-events";
 
-        protected override string GroupId => "notification-service-invite-responded";
+        
 
         protected override async Task ProcessMessageAsync(InviteRespondedEvent message)
         {
