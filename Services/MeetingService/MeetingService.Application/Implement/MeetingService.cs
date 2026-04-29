@@ -138,7 +138,7 @@ public class MeetingService : IMeetingService
             meeting.ActualStartTime = DateTime.UtcNow;
             meeting.Status = MeetingStatus.Live;
             await _unitOfWork.Meetings.UpdateAsync(meeting);
-            var acceptedInvites = await _unitOfWork.Meetings.GetAcceptedInvitesByMeetingIdAsync(meeting.Id);
+            var acceptedInvites = await _unitOfWork.Invites.GetAcceptedByMeetingIdAsync(meeting.Id);
             var outboxMessage = CreateOutboxMessage(nameof(MeetingStartedEvent), new MeetingStartedEvent
             {
                 MeetingId = meeting.Id,
@@ -174,13 +174,13 @@ public class MeetingService : IMeetingService
         try
         {
             meeting.Status = MeetingStatus.Ended;
-            var participants = await _unitOfWork.Meetings.GetParticipantsByRoomCodeAsync(roomCode);
+            var participants = await _unitOfWork.Participants.GetByRoomCodeAsync(roomCode);
             foreach (var p in participants)
             {
                 if (p.LeftAt == null)
                 {
                     p.LeftAt = DateTime.UtcNow;
-                    await _unitOfWork.Meetings.UpdateParticipantAsync(p);
+                    await _unitOfWork.Participants.UpdateAsync(p);
                 }
             }
 
@@ -245,7 +245,7 @@ public class MeetingService : IMeetingService
             {
                 roleId = (int)ParticipantRole.Guest;
                 var guest = new Guest { DisplayName = guestName! };
-                await _unitOfWork.Meetings.AddGuestAsync(guest);
+                await _unitOfWork.Participants.AddGuestAsync(guest);
                 guestId = guest.Id;
             }
 
@@ -260,7 +260,7 @@ public class MeetingService : IMeetingService
                 JoinToken = Guid.NewGuid().ToString()
             };
 
-            await _unitOfWork.Meetings.AddParticipantAsync(participant);
+            await _unitOfWork.Participants.AddAsync(participant);
             var outboxMessage = CreateOutboxMessage(nameof(ParticipantJoinedEvent), new ParticipantJoinedEvent
             {
                 ParticipantId = participant.Id,
@@ -287,14 +287,14 @@ public class MeetingService : IMeetingService
 
     public async Task<ApiResponse<bool>> LeaveMeetingAsync(string joinToken)
     {
-        var participant = await _unitOfWork.Meetings.GetParticipantByTokenAsync(joinToken);
+        var participant = await _unitOfWork.Participants.GetByTokenAsync(joinToken);
         if (participant == null)
             return ApiResponse<bool>.ErrorResponse(404, "Người tham gia không tồn tại");
         await _unitOfWork.BeginTransactionAsync();
         try
         {
             participant.LeftAt = DateTime.UtcNow;
-            await _unitOfWork.Meetings.UpdateParticipantAsync(participant);
+            await _unitOfWork.Participants.UpdateAsync(participant);
             var outboxMessage = CreateOutboxMessage(nameof(ParticipantLeftEvent), new ParticipantLeftEvent
             {
                 ParticipantId = participant.Id,
@@ -319,7 +319,7 @@ public class MeetingService : IMeetingService
 
     public async Task<ApiResponse<List<MeetingParticipantResponse>>> GetParticipantsAsync(string roomCode)
     {
-        var participants = await _unitOfWork.Meetings.GetParticipantsByRoomCodeAsync(roomCode);
+        var participants = await _unitOfWork.Participants.GetByRoomCodeAsync(roomCode);
 
         return ApiResponse<List<MeetingParticipantResponse>>.SuccessResponse(
             participants.Select(MapParticipant).ToList()
@@ -328,7 +328,7 @@ public class MeetingService : IMeetingService
 
     public async Task<ApiResponse<MeetingParticipantResponse>> GetParticipantByTokenAsync(string joinToken)
     {
-        var participant = await _unitOfWork.Meetings.GetParticipantByTokenAsync(joinToken);
+        var participant = await _unitOfWork.Participants.GetByTokenAsync(joinToken);
         if (participant == null)
             return ApiResponse<MeetingParticipantResponse>.ErrorResponse(404, "Không tìm thấy người tham gia");
 
@@ -431,7 +431,7 @@ public class MeetingService : IMeetingService
                     Status = "Pending",
                     ExpiresAt = DateTime.UtcNow.AddHours(2)
                 };
-                await _unitOfWork.Meetings.AddInviteAsync(invite);
+                await _unitOfWork.Invites.AddAsync(invite);
                 await _unitOfWork.SaveChangesAsync();
                 var outbox = CreateOutboxMessage(nameof(MeetingInvitedEvent), new MeetingInvitedEvent
                 {
@@ -460,7 +460,7 @@ public class MeetingService : IMeetingService
     }
     public async Task<ApiResponse<bool>> RespondInviteAsync(int inviteId, string inviteeEmail, string status)
     {
-        var invite = await _unitOfWork.Meetings.GetInviteByIdAsync(inviteId);
+        var invite = await _unitOfWork.Invites.GetByIdAsync(inviteId);
 
         if (invite == null)
             return ApiResponse<bool>.ErrorResponse(404, "Invite not found");
@@ -479,7 +479,7 @@ public class MeetingService : IMeetingService
         try
         {
             invite.Status = status;
-            await _unitOfWork.Meetings.UpdateInviteAsync(invite);
+            await _unitOfWork.Invites.UpdateAsync(invite);
 
             if (status == "Accepted")
             {
@@ -492,7 +492,7 @@ public class MeetingService : IMeetingService
                     RoleId = (int)ParticipantRole.User,
                     JoinToken = Guid.NewGuid().ToString()
                 };
-                await _unitOfWork.Meetings.AddParticipantAsync(participant);
+                await _unitOfWork.Participants.AddAsync(participant);
             }
 
             var outbox = CreateOutboxMessage(nameof(InviteRespondedEvent), new InviteRespondedEvent
@@ -514,5 +514,11 @@ public class MeetingService : IMeetingService
             await _unitOfWork.RollbackAsync();
             return ApiResponse<bool>.ErrorResponse(500, "Error responding invite");
         }
+    }
+    public async Task<ApiResponse<List<MeetingResponse>>> GetAcceptedInviteMeetingsAsync(string email)
+    {
+        var invites = await _unitOfWork.Invites.GetAcceptedByEmailAsync(email);
+        var meetings = invites.Where(i => i.Meeting != null).Select(i => MapMeeting(i.Meeting!)).ToList();
+        return ApiResponse<List<MeetingResponse>>.SuccessResponse(meetings);
     }
 }
