@@ -34,4 +34,12 @@
     {
          _context.Invites.Update(invite);
     }
+
+    public async Task<bool> ExistsPendingAsync(int meetingId, string email)
+    {
+        return await _context.Invites.AnyAsync(i =>
+            i.MeetingId == meetingId &&
+            i.InviteeEmail == email &&
+            i.Status == "Pending");
+    }
 }

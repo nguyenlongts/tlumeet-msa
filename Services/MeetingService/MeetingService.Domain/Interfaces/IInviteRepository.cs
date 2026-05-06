@@ -15,5 +15,6 @@ namespace MeetingService.Domain.Interfaces
 
         Task<List<MeetingInvite>> GetAcceptedByMeetingIdAsync(int meetingId);
         Task<List<MeetingInvite>> GetAcceptedByEmailAsync(string email);
+        Task<bool> ExistsPendingAsync(int meetingId, string email);
     }
 }
