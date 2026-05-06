@@ -9,7 +9,7 @@ public class PasswordResetConsumer : KafkaConsumerBase<PasswordResetEvent>
     private readonly IConfiguration _configuration;
 
 
-    protected override string Topic => "password-reset-requested";
+    protected override string Topic => "password-reset-events";
     protected override string GroupId => "notification-service-password-reset";
 
     public PasswordResetConsumer(IConfiguration configuration,ILogger<PasswordResetConsumer> logger,IServiceProvider serviceProvider): base(configuration, logger)
@@ -22,7 +22,7 @@ public class PasswordResetConsumer : KafkaConsumerBase<PasswordResetEvent>
     {
         using var scope = _serviceProvider.CreateScope();
         var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
-        var fe = _configuration["FE:BaseUrl"];
+        var fe = _configuration["FE:BaseUrl"] ?? throw new InvalidOperationException("FE:BaseUrl is not configured");
 
         var resetLink = $"{fe}/reset-password?token={message.ResetToken}";
 
