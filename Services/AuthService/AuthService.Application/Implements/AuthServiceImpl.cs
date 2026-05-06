@@ -120,40 +120,36 @@ public class AuthServiceImpl : IAuthService
         if (user == null)
             return ApiResponse<AuthResponse>.ErrorResponse(401, "Email hoặc mật khẩu không chính xác");
 
-        var isLocked = await _unitOfWork.Users.IsAccountLockedAsync(user);
-        if (isLocked)
-        {
-            if (!user.IsActive)
-                return ApiResponse<AuthResponse>.ErrorResponse(403, "Tài khoản đã bị vô hiệu hóa");
+        if (!user.IsActive)
+            return ApiResponse<AuthResponse>.ErrorResponse(403, "Tài khoản đã bị vô hiệu hóa");
 
-            if (user.LoginInfo?.AccountLockedUntil.HasValue == true)
-            {
-                var remainingMinutes = (int)Math.Ceiling(
-                    (user.LoginInfo.AccountLockedUntil.Value - DateTime.UtcNow).TotalMinutes);
-                return ApiResponse<AuthResponse>.ErrorResponse(403,
-                    $"Tài khoản bị khóa. Thử lại sau {remainingMinutes} phút");
-            }
+        var isLocked = await _unitOfWork.Users.IsAccountLockedAsync(user);
+        if (isLocked && user.LoginInfo?.AccountLockedUntil.HasValue == true)
+        {
+            var remainingMinutes = (int)Math.Ceiling(
+                (user.LoginInfo.AccountLockedUntil.Value - DateTime.UtcNow).TotalMinutes);
+            return ApiResponse<AuthResponse>.ErrorResponse(403,
+                $"Tài khoản bị khóa. Thử lại sau {remainingMinutes} phút");
         }
 
         var isValidPassword = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
         if (!isValidPassword)
         {
             await _unitOfWork.Users.IncrementFailedLoginAttemptsAsync(user);
+            await _unitOfWork.SaveChangesAsync();
 
             var isLockedAfterFail = await _unitOfWork.Users.IsAccountLockedAsync(user);
             if (isLockedAfterFail)
-            {
                 return ApiResponse<AuthResponse>.ErrorResponse(403,
                     "Tài khoản đã bị khóa do đăng nhập sai quá nhiều lần");
-            }
 
             return ApiResponse<AuthResponse>.ErrorResponse(401, "Email hoặc mật khẩu không chính xác");
         }
-        var refreshTokenExpDays = int.Parse(_configuration["Jwt:RefreshTokenExpiration"] ?? "7");
 
         var refreshToken = Guid.NewGuid();
         try
         {
+            var refreshTokenExpDays = int.Parse(_configuration["Jwt:RefreshTokenExpiration"] ?? "7");
             await _unitOfWork.BeginTransactionAsync();
             if (user.LoginInfo != null)
             {
@@ -174,7 +170,6 @@ public class AuthServiceImpl : IAuthService
             });
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitAsync();
-
         }
         catch (Exception ex)
         {
@@ -182,8 +177,8 @@ public class AuthServiceImpl : IAuthService
             _logger.LogError(ex, "Lỗi transaction Login");
             return ApiResponse<AuthResponse>.ErrorResponse(500, "Lỗi server, vui lòng thử lại sau");
         }
-        var token = GenerateJwtToken(user);
 
+        var token = GenerateJwtToken(user);
         var response = new AuthResponse
         {
             Id = user.Id,
