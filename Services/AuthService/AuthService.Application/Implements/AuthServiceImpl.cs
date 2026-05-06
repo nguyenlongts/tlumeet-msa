@@ -179,6 +179,7 @@ public class AuthServiceImpl : IAuthService
         }
 
         var token = GenerateJwtToken(user);
+
         var response = new AuthResponse
         {
             Id = user.Id,
@@ -205,6 +206,9 @@ public class AuthServiceImpl : IAuthService
         var user = await _unitOfWork.Users.GetByEmailAsync(userEmail);
         if (user == null)
             return ApiResponse<bool>.ErrorResponse(404, "Người dùng không tồn tại");
+
+        if (!user.IsActive)
+            return ApiResponse<bool>.ErrorResponse(403, "Tài khoản đã bị vô hiệu hóa");
 
         var isValid = BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash);
         if (!isValid)
@@ -284,7 +288,11 @@ public class AuthServiceImpl : IAuthService
         return ApiResponse<bool>.SuccessResponse(true, "Đã gửi email đặt lại mật khẩu");
 
     }
-
+    private static string PadBase64(string base64)
+    {
+        base64 = base64.Replace('-', '+').Replace('_', '/');
+        return base64.PadRight(base64.Length + (4 - base64.Length % 4) % 4, '=');
+    }
     public async Task<ApiResponse<bool>> ResetPasswordAsync(ResetPasswordRequest request)
     {
 
@@ -295,33 +303,50 @@ public class AuthServiceImpl : IAuthService
             return ApiResponse<bool>.ErrorResponse(400, "Mật khẩu mới tối thiểu 6 ký tự");
 
         var handler = new JwtSecurityTokenHandler();
-        JwtSecurityToken jwt;
+        handler.InboundClaimTypeMap.Clear();
+        var rawToken = handler.ReadJwtToken(request.Token);
 
         try
         {
             var validationParams = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!)),
+                IssuerSigningKey = new SymmetricSecurityKey(
+                    Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!)),
                 ValidateIssuer = false,
                 ValidateAudience = false,
                 ValidateLifetime = true
             };
-            handler.ValidateToken(request.Token, validationParams, out var validatedToken);
-            jwt = (JwtSecurityToken)validatedToken;
+            handler.ValidateToken(request.Token, validationParams, out _); 
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "JWT validation failed");
             return ApiResponse<bool>.ErrorResponse(400, "Token không hợp lệ");
         }
-
-        var type = jwt.Claims.FirstOrDefault(c => c.Type == "type")?.Value;
-        if (type != "reset-password")
+        var parts = request.Token.Split('.');
+        if (parts.Length != 3)
             return ApiResponse<bool>.ErrorResponse(400, "Token không hợp lệ");
+
+        var payloadJson = Encoding.UTF8.GetString(
+            Convert.FromBase64String(PadBase64(parts[1])));
+
+        var payloadDoc = JsonDocument.Parse(payloadJson);
+        var purpose = payloadDoc.RootElement.TryGetProperty("purpose", out var p)? p.GetString() : null;
+        var userEmail = payloadDoc.RootElement.TryGetProperty("email", out var e)? e.GetString() : null;
+        var exp = payloadDoc.RootElement.TryGetProperty("exp", out var expVal)? expVal.GetInt64() : 0;
+      
+
+        if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() > exp)
+            return ApiResponse<bool>.ErrorResponse(400, "Token đã hết hạn");
+
+        if (purpose != "reset-password")
+            return ApiResponse<bool>.ErrorResponse(400, "Token không hợp lệ");
+
         var savedToken = await _unitOfWork.Users.GetResetTokenAsync(request.Token);
         if (savedToken == null || savedToken.IsUsed || savedToken.ExpiresAt < DateTime.UtcNow)
             return ApiResponse<bool>.ErrorResponse(400, "Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn");
-        var userEmail = jwt.Claims.First(c => c.Type == "email").Value;
+
         var user = await _unitOfWork.Users.GetByEmailAsync(userEmail);
 
         if (user == null)
@@ -383,20 +408,27 @@ public class AuthServiceImpl : IAuthService
 
     private string GenerateResetPasswordToken(User user)
     {
-        var jwtKey = _configuration["Jwt:Key"];
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey!));
+        var jwtKey = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
+        var jwtIssuer = _configuration["Jwt:Issuer"];
+        var jwtAudience = _configuration["Jwt:Audience"];
+        var expirationMinutes = 15;
 
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+        var claims = new[]
+        {
+            new Claim("email", user.Email),
+            new Claim("purpose", "reset-password"),
+        };
         var token = new JwtSecurityToken(
-            claims: new[]
-            {
-                new Claim("email", user.Email),
-                new Claim("type", "reset-password")
-            },
-            expires: DateTime.UtcNow.AddMinutes(15),
+            issuer: jwtIssuer,
+            audience: jwtAudience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(expirationMinutes),
             signingCredentials: new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256)
         );
-
         return new JwtSecurityTokenHandler().WriteToken(token);
+
     }
 
     private bool IsValidEmail(string email)
@@ -420,6 +452,10 @@ public class AuthServiceImpl : IAuthService
         var user = await _unitOfWork.Users.GetByIdAsync(existingToken.UserId);
         if (user == null)
             return ApiResponse<AuthResponse>.ErrorResponse(401, "Người dùng không tồn tại");
+
+        if (!user.IsActive)
+            return ApiResponse<AuthResponse>.ErrorResponse(403, "Tài khoản đã bị vô hiệu hóa");
+
         try
         {
             await _unitOfWork.BeginTransactionAsync();
