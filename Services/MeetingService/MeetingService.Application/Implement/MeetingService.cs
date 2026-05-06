@@ -41,6 +41,8 @@ public class MeetingService : IMeetingService
         try
         {
             await _unitOfWork.Meetings.CreateAsync(meeting);
+            await _unitOfWork.SaveChangesAsync();
+
             var outboxMessage = CreateOutboxMessage(nameof(MeetingCreatedEvent), new MeetingCreatedEvent
             {
                 MeetingId = meeting.Id,
@@ -246,6 +248,7 @@ public class MeetingService : IMeetingService
                 roleId = (int)ParticipantRole.Guest;
                 var guest = new Guest { DisplayName = guestName! };
                 await _unitOfWork.Participants.AddGuestAsync(guest);
+                await _unitOfWork.SaveChangesAsync();
                 guestId = guest.Id;
             }
 
@@ -261,6 +264,8 @@ public class MeetingService : IMeetingService
             };
 
             await _unitOfWork.Participants.AddAsync(participant);
+            await _unitOfWork.SaveChangesAsync();
+
             var outboxMessage = CreateOutboxMessage(nameof(ParticipantJoinedEvent), new ParticipantJoinedEvent
             {
                 ParticipantId = participant.Id,
@@ -421,8 +426,12 @@ public class MeetingService : IMeetingService
         await _unitOfWork.BeginTransactionAsync();
         try
         {
+            var invites = new List<MeetingInvite>();
             foreach (var email in emails)
             {
+                if (await _unitOfWork.Invites.ExistsPendingAsync(meeting.Id, email))
+                    continue;
+
                 var invite = new MeetingInvite
                 {
                     MeetingId = meeting.Id,
@@ -432,7 +441,13 @@ public class MeetingService : IMeetingService
                     ExpiresAt = DateTime.UtcNow.AddHours(2)
                 };
                 await _unitOfWork.Invites.AddAsync(invite);
-                await _unitOfWork.SaveChangesAsync();
+                invites.Add(invite);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+
+            foreach (var invite in invites)
+            {
                 var outbox = CreateOutboxMessage(nameof(MeetingInvitedEvent), new MeetingInvitedEvent
                 {
                     InviteId = invite.Id,
@@ -440,7 +455,7 @@ public class MeetingService : IMeetingService
                     HostEmail = hostEmail,
                     HostName = hostEmail,
                     Title = meeting.Title,
-                    InviteeEmail = email,
+                    InviteeEmail = invite.InviteeEmail,
                     JoinLink = $"/join/{roomCode}",
                     ExpiresAt = invite.ExpiresAt
                 });
@@ -466,6 +481,8 @@ public class MeetingService : IMeetingService
             return ApiResponse<bool>.ErrorResponse(404, "Invite not found");
         if (invite.InviteeEmail != inviteeEmail)
             return ApiResponse<bool>.ErrorResponse(403, "Not allowed");
+        if (status != "Accepted" && status != "Declined")
+            return ApiResponse<bool>.ErrorResponse(400, "Trạng thái không hợp lệ");
         if (invite.Status != "Pending")
             return ApiResponse<bool>.ErrorResponse(400, "Invite already responded");
         if (invite.ExpiresAt < DateTime.UtcNow)
