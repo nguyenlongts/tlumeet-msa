@@ -82,7 +82,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "kafka-broker-api-versions --bootstrap-server localhost:9094 || exit 1",
+          "kafka-broker-api-versions --bootstrap-server localhost:29092  || exit 1",
         ]
       interval: 10s
       timeout: 10s
@@ -126,7 +126,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "kafka-broker-api-versions --bootstrap-server localhost:9095 || exit 1",
+          "kafka-broker-api-versions --bootstrap-server localhost:29092  || exit 1",
         ]
       interval: 10s
       timeout: 10s

@@ -9,7 +9,7 @@ public class PasswordResetConsumer : KafkaConsumerBase<PasswordResetEvent>
     private readonly IConfiguration _configuration;
 
 
-    protected override string Topic => "password-reset-events";
+    protected override string Topic => "password-reset-requested";
     protected override string GroupId => "notification-service-password-reset";
 
     public PasswordResetConsumer(IConfiguration configuration,ILogger<PasswordResetConsumer> logger,IServiceProvider serviceProvider): base(configuration, logger)
