@@ -8,11 +8,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-
+using System.Security.Claims;
 namespace AuthService.Application.Services.Implements;
 
 public class AuthServiceImpl : IAuthService
@@ -390,7 +389,7 @@ public class AuthServiceImpl : IAuthService
         {
             new Claim("userId", user.Id.ToString()),
             new Claim("name", user.UserName),
-            new Claim(ClaimTypes.Email, user.Email),
+            new Claim("email", user.Email),
             new Claim("role", user.Role?.Name ?? "User"),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
