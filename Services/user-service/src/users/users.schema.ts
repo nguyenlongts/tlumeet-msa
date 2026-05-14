@@ -16,6 +16,9 @@ export class User{
   
   @Prop({ default: 'user', enum: ['user', 'admin'] })
   role: string;
+  
+  @Prop({required:true, default:true})
+  isActive: boolean;
 
   @Prop()
   registeredAt:Date;

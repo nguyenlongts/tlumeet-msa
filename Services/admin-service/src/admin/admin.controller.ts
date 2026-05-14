@@ -1,4 +1,12 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Delete,
+  Param,
+  ParseIntPipe,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { AdminService } from './admin.service';
 import { JwtAdminGuard } from './jwt-admin.guard';
@@ -14,9 +22,11 @@ export class AdminController {
   }
 
   @Get('users')
-  @UseGuards(JwtAdminGuard)
-  getUsers() {
-    return this.adminService.getUsers();
+  async getUsers(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+  ) {
+    return this.adminService.getUsers(Number(page), Number(limit));
   }
 
   @Get('meetings')
@@ -25,14 +35,22 @@ export class AdminController {
     return this.adminService.getMeetings();
   }
 
+  @Delete('users/:id')
+  @UseGuards(JwtAdminGuard)
+  deleteUser(@Param('id', ParseIntPipe) id: number) {
+    return this.adminService.deleteUser(id);
+  }
 
   @EventPattern('user-registered-events')
-  handleUserRegistered(@Payload() data: {
-    UserId: number;
-    UserName: string;
-    Email: string;
-    RegisteredAt: string;
-  }) {
+  handleUserRegistered(
+    @Payload()
+    data: {
+      UserId: number;
+      UserName: string;
+      Email: string;
+      RegisteredAt: string;
+    },
+  ) {
     return this.adminService.handleUserRegistered(data);
   }
 
@@ -45,37 +63,47 @@ export class AdminController {
       RoomCode: string;
       HostEmail: string;
       CreatedAt: string;
-    }) {
+    },
+  ) {
     return this.adminService.handleMeetingCreated(data);
   }
 
   @EventPattern('meeting-started-events')
-  handleMeetingStarted(@Payload() data: {
-    MeetingId: number;
-    RoomCode: string;
-    HostEmail: string;
-    StartedAt: string;
-  }) {
+  handleMeetingStarted(
+    @Payload()
+    data: {
+      MeetingId: number;
+      RoomCode: string;
+      HostEmail: string;
+      StartedAt: string;
+    },
+  ) {
     return this.adminService.handleMeetingStarted(data);
   }
 
   @EventPattern('meeting-ended-events')
-  handleMeetingEnded(@Payload() data: {
-    MeetingId: number;
-    RoomCode: string;
-    HostEmail: string;
-    EndedAt: string;
-  }) {
+  handleMeetingEnded(
+    @Payload()
+    data: {
+      MeetingId: number;
+      RoomCode: string;
+      HostEmail: string;
+      EndedAt: string;
+    },
+  ) {
     return this.adminService.handleMeetingEnded(data);
   }
 
   @EventPattern('meeting-deleted-events')
-  handleMeetingDeleted(@Payload() data: {
-    MeetingId: number;
-    RoomCode: string;
-    HostEmail: string;
-    DeletedAt: string;
-  }) {
+  handleMeetingDeleted(
+    @Payload()
+    data: {
+      MeetingId: number;
+      RoomCode: string;
+      HostEmail: string;
+      DeletedAt: string;
+    },
+  ) {
     return this.adminService.handleMeetingDeleted(data);
   }
 
@@ -87,5 +115,17 @@ export class AdminController {
   @EventPattern('participant-left-events')
   handleParticipantLeft(@Payload() data: { MeetingId: number }) {
     return this.adminService.handleParticipantLeft(data);
+  }
+
+  @EventPattern('user-updated-events')
+  handleUserUpdated(
+    @Payload()
+    data: {
+      userId: number;
+      updatedFields: Record<string, any>;
+      updatedAt: string;
+    },
+  ) {
+    return this.adminService.handleUserUpdated(data);
   }
 }

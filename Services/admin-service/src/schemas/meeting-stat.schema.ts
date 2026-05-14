@@ -18,7 +18,7 @@ export class MeetingStat {
   hostEmail: string;
 
   @Prop({
-    default: 'created',
+    default: 'scheduled',
     enum: ['scheduled', 'live', 'ended', 'waitingForHost'],
   })
   status: string;

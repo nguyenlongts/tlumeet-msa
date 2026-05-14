@@ -14,6 +14,15 @@ export class UserStat {
   @Prop({ required: true })
   userName: string;
 
+  @Prop({ default: 'user', enum: ['user', 'admin'] })
+  role: string;
+  
+  @Prop()
+  avatarUrl: string;
+
+  @Prop({required:true, default:true})
+  isActive: boolean;
+
   @Prop()
   registeredAt: Date;
 }

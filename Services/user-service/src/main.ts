@@ -16,7 +16,7 @@ async function bootstrap() {
     transport: Transport.KAFKA,
     options: {
       client: {
-        brokers: [process.env.KAFKA_BROKERS || 'kafka:9092'],
+        brokers: (process.env.KAFKA_BROKERS || 'kafka:29092').split(','),
       },
       consumer: { groupId: 'user-service-group' },
     },

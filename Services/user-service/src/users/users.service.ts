@@ -43,13 +43,28 @@ export class UsersService {
   }
 
   async updateProfile(userId:number,data:{name?:string,phone?:string,address?:string,avatarUrl?:string}){
-    const user=await this.userModel.findOneAndUpdate(
+
+    const updatedUser=await this.userModel.findOneAndUpdate(
       {userId},
       data,
       {new:true}
     )
-    if (!user) throw new NotFoundException("User không tồn tại!")
-    return user;
+    if (!updatedUser) throw new NotFoundException("User không tồn tại!")
+    const { name, ...rest } = data
+    const updatedFields = {
+      ...rest,
+      ...(name && { userName: name }),
+    }
+
+    this.kafkaClient.emit('user-updated-events',{
+      key: String(userId),          
+      value: {
+        userId,
+        updatedFields,
+        updatedAt: new Date().toISOString(),
+      },
+    })
+    return updatedUser;
   }
 
 
@@ -63,6 +78,10 @@ export class UsersService {
     });
 
     return { deleted: true };
+  }
+
+  async updateAvatar(userId: string, avatarUrl: string) {
+    return this.userModel.findByIdAndUpdate(userId, { avatarUrl })
   }
 
 }

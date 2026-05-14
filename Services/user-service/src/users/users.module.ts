@@ -5,6 +5,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { User, UserSchema } from './users.schema';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
+import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -15,12 +16,13 @@ import { UsersController } from './users.controller';
         transport: Transport.KAFKA,
         options: {
           client: {
-            brokers: [process.env.KAFKA_BROKERS || 'kafka:9092'],
+            brokers: (process.env.KAFKA_BROKERS ?? 'kafka:29092').split(','),
           },
           producer: { allowAutoTopicCreation: true },
         },
       },
     ]),
+    CloudinaryModule
   ],
   providers: [UsersService],
   controllers: [UsersController],

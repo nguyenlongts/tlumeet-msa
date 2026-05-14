@@ -34,7 +34,7 @@ export class JwtAdminGuard implements CanActivate {
         secret: process.env.JWT_SECRET,
       });
 
-      if (payload.role !== 'admin') {
+      if (payload.role !== 'Admin') {
         throw new ForbiddenException('Không có quyền truy cập');
       }
 

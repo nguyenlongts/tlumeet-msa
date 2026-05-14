@@ -4,13 +4,25 @@ import {
   Get, Patch, Delete,
   Body, Param, Headers,
   ParseIntPipe,
+  UseInterceptors,
+  BadRequestException,
+  UploadedFile,
+  Req,
+  Post,
 } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { UsersService } from './users.service';
+import { memoryStorage } from 'multer';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 
 @Controller('api/users')
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  constructor(
+    private usersService: UsersService,
+    private cloudinaryService: CloudinaryService
+  ) 
+    {}
 
 
   @Get()
@@ -23,7 +35,7 @@ export class UsersController {
     return this.usersService.getProfile(userId)
   }
 
-  @Patch(':userId')
+  @Patch('/update/:userId')
   updateProfile(
     @Param('userId') userId:number,
     @Body() body:{
@@ -41,7 +53,27 @@ export class UsersController {
     return this.usersService.remove(id);
   }
 
-  // ── Kafka consumers — nhận event từ .NET ──────────────
+  @Post('/upload-avatar')
+  // @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('avatar', {
+    storage: memoryStorage(), 
+    fileFilter: (req, file, cb) => {
+      if (!file.mimetype.match(/\/(jpg|jpeg|png|webp)$/)) {
+        return cb(new BadRequestException('Chỉ chấp nhận ảnh'), false)
+      }
+      cb(null, true)
+    },
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+  }))
+  async uploadAvatar(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req,
+  ) {
+    const avatarUrl = await this.cloudinaryService.uploadImage(file)
+    // await this.usersService.updateAvatar(req.user.id, avatarUrl)
+    return { avatarUrl }
+  }
+
 
   @EventPattern('user-registered-events')
   handleUserRegistered(@Payload() data: {
